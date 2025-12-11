@@ -51,6 +51,11 @@ Within this folder you will find scripts to interact with new amendments that ar
 - `tokenEscrow.js` → Use MPT with Escrow instead of XRP
 - `credential.js` -> Demonstrates On-Chain Credentials functionality
 
+### Utils (`utils/`)
+Within this folder you will find utils script.
+- `tokenPriceQuery.js` → Helps you find the best rate for an asset pair by querying the CLOB and AMM.
+
+
 ## 🔧 Installation & Setup
 
 ### JavaScript

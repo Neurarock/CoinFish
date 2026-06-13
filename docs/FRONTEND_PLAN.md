@@ -80,9 +80,9 @@ After the account is created the card reveals the onboarding steps:
    orange→green flip; on pass the backend assigns a demo credit score that feeds
    the rate engine.
 3. **Connect XRPL signer** — choose Xaman, Crossmark, GemWallet, or a Devnet
-   demo signer. The proof of concept records the chosen provider, XRPL address,
-   demo RLUSD balance in SQLite so refresh/login keeps the same wallet state.
-   In live-chain mode the connected account also gets an XRPL Explorer link.
+   signer. The proof of concept records the chosen provider, Devnet XRPL address,
+   seed, and RLUSD balance in SQLite so refresh/login keeps the same wallet
+   state. The connected account gets an XRPL Explorer link.
 
 When KYC (+ credit for borrowers) is green and a wallet is connected, the **Enter
 app** button activates and routes into the right world. **Login** is a simple
@@ -93,9 +93,10 @@ Headline + a professional **risk notice** (not bank deposits, capital at risk,
 variable yield, exit-queue behaviour, first-loss ≠ no-loss, Devnet demo). Then the
 **three pools** as cards, each disclosing: net & base APR, first-loss buffer %,
 first-loss capital, idle/available liquidity, and a `PoolWater` tank showing how
-saturated it is. Selecting a pool opens a deposit panel. On success it shows a
-highlighted **Verify on XRPL** link in live-chain mode, or a **Demo receipt** in
-local demo mode, updates the persisted wallet balance, and refreshes pool numbers.
+saturated it is. Each pool includes **Verify vault** and **Verify broker**
+Explorer links. Selecting a pool opens a deposit panel. On success it shows a
+highlighted **Verify on XRPL** transaction link, updates the persisted wallet
+balance, and refreshes pool numbers.
 
 ### 3.3 Lender · Dashboard (`pages/LenderDashboard.jsx`)
 Top stats: total deposited, vault shares, accrued yield (estimate). Then a card per
@@ -122,8 +123,9 @@ collateral and current LTV, showing from-APR, max borrow, current LTV, pool
 liquidity. Pick an eligible pool, enter amount + term (≤24h), **Request quote**.
 The quote is **live for 5 seconds**: a circular countdown ring runs down; **Accept**
 within the window disburses RLUSD to the connected wallet (shows the highlighted
-XRPL explorer verification link in live-chain mode, or a demo receipt locally,
-then routes to the dashboard). After 0s the button flips to "Expired — re-quote".
+XRPL explorer verification link and records the XRPL loan object for later
+verification, then routes to the dashboard). After 0s the button flips to
+"Expired — re-quote".
 
 ### 3.6 Borrower · Dashboard (`pages/BorrowerDashboard.jsx`)
 Stats: total borrowed, outstanding, interest paid, available collateral. An itemised

@@ -29,7 +29,6 @@ export default function BorrowerDashboard() {
         tone: "good",
         tx_hash: r.tx_hash,
         explorer_url: r.explorer_url,
-        receipt_url: r.receipt_url,
       });
       load();
     } catch (e) { setMsg({ loanId, text: e.message, tone: "bad" }); }
@@ -76,9 +75,14 @@ export default function BorrowerDashboard() {
               {l.default_charge > 0 && <> · default charge {rlusd(l.default_charge)}</>}
             </div>
             <VerifyLink
-              href={l.origination_explorer_url || l.origination_receipt_url}
+              href={l.origination_explorer_url}
               hash={l.origination_tx}
-              label={l.origination_explorer_url ? "Verify origination on XRPL" : "Origination demo receipt"}
+              label="Verify origination on XRPL"
+            />
+            <VerifyLink
+              href={l.loan_explorer_url}
+              hash={l.xrpl_loan_id}
+              label="Verify loan object"
             />
             {l.status === "active" && (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -99,9 +103,9 @@ export default function BorrowerDashboard() {
               <div className="mt-2 text-sm" style={{ color: `var(--${msg.tone})` }}>
                 {msg.text}
                 <VerifyLink
-                  href={msg.explorer_url || msg.receipt_url}
+                  href={msg.explorer_url}
                   hash={msg.tx_hash}
-                  label={msg.explorer_url ? "Verify on XRPL" : "Demo receipt"}
+                  label="Verify on XRPL"
                 />
               </div>
             )}

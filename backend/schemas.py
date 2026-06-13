@@ -78,6 +78,10 @@ class PoolOut(BaseModel):
     drawn: float
     utilisation: float             # 0..1, drives the water-level animation
     first_loss_capital: float
+    vault_id: str = ""
+    loan_broker_id: str = ""
+    vault_explorer_url: str = ""
+    loan_broker_explorer_url: str = ""
 
 
 class LenderDashboardOut(BaseModel):

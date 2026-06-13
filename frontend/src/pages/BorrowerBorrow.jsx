@@ -48,7 +48,6 @@ export default function BorrowerBorrow() {
         text: `Disbursed ${rlusd(r.principal)} to ${r.disbursed_to.slice(0, 12)}…. Wallet balance ${rlusd(r.wallet_balance)}.`,
         tx_hash: r.tx_hash,
         explorer_url: r.explorer_url,
-        receipt_url: r.receipt_url,
       });
       setQuote(null);
       setTimeout(() => nav("/borrower/dashboard"), 1200);
@@ -68,8 +67,8 @@ export default function BorrowerBorrow() {
 
       <div className="grid gap-4 md:grid-cols-3">
         {d.eligible_pools.map((p) => (
-          <button key={p.key} disabled={!p.eligible} onClick={() => setPool(p.key)}
-            className="card p-4 text-left disabled:opacity-40"
+          <div key={p.key}
+            className="card p-4 text-left"
             style={{ outline: pool === p.key ? "2px solid var(--accent)" : "none" }}>
             <div className="flex items-center justify-between">
               <div className="font-bold">{p.name}</div>
@@ -79,7 +78,19 @@ export default function BorrowerBorrow() {
             <Row k="Max borrow" v={rlusd(p.max_borrow)} />
             <Row k="Current LTV" v={pct(p.current_ltv)} />
             <Row k="Pool liquidity" v={rlusd(p.available_liquidity)} />
-          </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <VerifyLink href={p.vault_explorer_url} hash={p.vault_id} label="Verify vault" />
+              <VerifyLink href={p.loan_broker_explorer_url} hash={p.loan_broker_id} label="Verify broker" />
+            </div>
+            <Button
+              variant={pool === p.key ? "primary" : "ghost"}
+              className="mt-3 w-full justify-center"
+              disabled={!p.eligible}
+              onClick={() => setPool(p.key)}
+            >
+              {p.eligible ? (pool === p.key ? "Selected" : "Select pool") : "Not eligible"}
+            </Button>
+          </div>
         ))}
       </div>
 
@@ -124,9 +135,9 @@ export default function BorrowerBorrow() {
         <div className="mt-4 text-sm" style={{ color: msg.error ? "var(--bad)" : "var(--accent)" }}>
           {msg.error || msg.text}
           <VerifyLink
-            href={msg.explorer_url || msg.receipt_url}
+            href={msg.explorer_url}
             hash={msg.tx_hash}
-            label={msg.explorer_url ? "Verify on XRPL" : "Demo receipt"}
+            label="Verify on XRPL"
           />
         </div>
       )}

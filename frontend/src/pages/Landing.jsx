@@ -76,7 +76,7 @@ export default function Landing() {
     <div className={`app-bg ${THEME[role]} min-h-screen flex flex-col`}>
       <div className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2 text-xl font-extrabold">
-          <span className="text-2xl">🐟</span> CoinFish
+          <span className="brand-mark">CF</span> CoinFish
         </div>
         <a href="/vault" className="text-sm font-semibold" style={{ color: "var(--fg-soft)" }}>
           CoinFish vault ↗
@@ -195,13 +195,7 @@ function WalletConnect({ wallet, choice, setChoice, address, setAddress, onConne
           </div>
           <Pill tone="good">{rlusd(wallet.rlusd_balance)}</Pill>
         </div>
-        {wallet.explorer_url ? (
-          <VerifyLink href={wallet.explorer_url} label="View account on XRPL" />
-        ) : (
-          <div className="mt-2 text-xs" style={{ color: "var(--fg-soft)" }}>
-            Local demo signer. No XRPL account was funded in demo mode.
-          </div>
-        )}
+        <VerifyLink href={wallet.explorer_url} label="View account on XRPL" />
       </div>
     );
   }
@@ -224,10 +218,10 @@ function WalletConnect({ wallet, choice, setChoice, address, setAddress, onConne
         ))}
       </div>
       <Field
-        label="Wallet address (optional for demo)"
+        label="Wallet address"
         value={address}
         onChange={(e) => setAddress(e.target.value)}
-        placeholder="r..."
+        placeholder="Devnet faucet wallet is created if empty"
       />
       <Button className="w-full justify-center" onClick={onConnect}>
         Approve sign-in and connect

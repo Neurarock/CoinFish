@@ -102,13 +102,13 @@ function WithdrawMsg({ msg }) {
     <div className="mt-2 text-sm" style={{ color: tone }}>
       <div>{msg.message} Wallet balance {rlusd(msg.wallet_balance)}.</div>
       {(msg.tx_hashes || []).map((hash, i) => {
-        const href = msg.explorer_urls?.[i] || msg.receipt_urls?.[i];
+        const href = msg.explorer_urls?.[i];
         return (
           <VerifyLink
             key={hash}
             href={href}
             hash={hash}
-            label={msg.explorer_urls?.[i] ? "Verify on XRPL" : "Demo receipt"}
+            label="Verify on XRPL"
           />
         );
       })}

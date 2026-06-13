@@ -100,10 +100,6 @@ directory.
 Useful variables:
 
 - `COINFISH_DB_URL`: local defaults to `sqlite:///./coinfish.db`.
-- `COINFISH_LIVE_CHAIN`: set to `1` to route supported actions to XRPL Devnet.
-- `COINFISH_REQUIRE_DEVNET_TRANSACTIONS`: defaults to `1`. Keep it enabled for
-  app use. Set to `0` only for local unit/smoke tests that intentionally avoid
-  network submits.
 - `COINFISH_SETUP_JSON`: path to Devnet bootstrap ids/seeds, default `setup.json`.
 - `COINFISH_ISSUER_SEED`, `COINFISH_ISSUER_ADDRESS`, `COINFISH_OPERATOR_SEED`:
   Devnet throwaway setup values.
@@ -118,9 +114,8 @@ state, use a hosted database and set `COINFISH_DB_URL` to its SQLAlchemy URL.
 ## Notes
 
 - Real XRPL actions need Devnet setup values configured as Vercel environment
-  variables and `COINFISH_LIVE_CHAIN=1`.
+  variables. There is no local synthetic transaction mode.
 - The app rejects wallet/deposit/withdraw/loan/repay/default actions unless
-  Devnet transaction mode is active, except when
-  `COINFISH_REQUIRE_DEVNET_TRANSACTIONS=0` is explicitly set for developer tests.
+  Devnet setup is complete.
 - SQLite is fine locally. Do not treat Vercel `/tmp` SQLite as production
   persistence.

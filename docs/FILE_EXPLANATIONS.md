@@ -51,10 +51,10 @@ main groups are auth, wallet, lender, borrower, and admin dashboard models.
 
 The runtime bridge between the API and XRPL service layer. It holds the three pool
 states, quote cache, exit queues, Devnet setup ids, and fee totals. It also
-provides `LIVE_CHAIN`, controlled by `COINFISH_LIVE_CHAIN=1`.
+reports Devnet readiness for the frontend header.
 
-In demo mode, pool TVL/drawn/first-loss values are seeded so the dashboards look
-alive immediately. In live-chain mode, selected actions call `backend/xrpl_service`.
+Pool TVL/drawn/first-loss values are seeded so the dashboards have immediate
+context. Frontend-driven money actions call `backend/xrpl_service`.
 Frontend-driven XRPL transaction hashes are persisted in `OnChainTx`.
 
 ### `backend/services.py`
@@ -65,7 +65,7 @@ Shared backend helpers:
 - FastAPI dependencies for current account, session, and role gating;
 - account serialization;
 - collateral balance math;
-- wallet balance, demo receipt, and XRPL explorer URL helpers.
+- wallet balance and XRPL explorer URL helpers.
 
 The collateral helpers deliberately treat `lock` and `release` rows as
 informational ring-fencing, not custody movements. This avoids double-counting
@@ -176,8 +176,7 @@ enter the role journey.
 The lender's first post-login screen. It shows professional risk warnings, the
 three pool cards, wallet status, and a deposit form. Successful deposits refresh
 pool data, update persisted wallet balance, and show the returned transaction hash
-with either an XRPL explorer verification link in live-chain mode or a demo receipt
-in local mode.
+with an XRPL Explorer verification link.
 
 ### `frontend/src/pages/LenderDashboard.jsx`
 
@@ -217,16 +216,14 @@ with grace-extension controls.
 `backend/routers/pools.py` provides shared pool read endpoints.
 `backend/routers/loans.py` provides a read-only loan status lookup used by support
 or future detail pages. `backend/routers/transactions.py` exposes the persisted
-XRPL transaction ledger. `backend/routers/receipts.py` remains only for
-developer-demo tests where Devnet transaction enforcement is explicitly disabled.
+XRPL transaction ledger.
 
 ### Existing backend engines used by the UX layer
 
 `backend/config.py` defines the three pool configs, fees, and Devnet settings.
 `backend/risk_engine.py` produces borrower quote pricing and approval decisions.
 `backend/exit_queue.py` implements lender withdrawal queue mechanics.
-`backend/xrpl_service/*` contains the lower-level Devnet operations reused when
-`COINFISH_LIVE_CHAIN=1`.
+`backend/xrpl_service/*` contains the lower-level Devnet operations.
 
 ### Frontend component helpers
 
@@ -234,8 +231,7 @@ developer-demo tests where Devnet transaction enforcement is explicitly disabled
 `frontend/src/components/QrCode.jsx` renders a deterministic QR-like code for the
 bank transfer payload without adding a dependency.
 `frontend/src/components/ui.jsx` contains small shared UI atoms, formatting
-helpers, and the highlighted `VerifyLink` used for XRPL explorer verification or
-local demo receipts.
+helpers, and the highlighted `VerifyLink` used for XRPL Explorer verification.
 
 ### Frontend project configuration
 

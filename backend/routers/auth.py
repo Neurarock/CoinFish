@@ -9,15 +9,13 @@ an external provider and flip the stored status from pending (orange) to passed
 from __future__ import annotations
 
 import random
-import hashlib
-import secrets
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlmodel import Session, select
 
 from .. import db
 from ..db import Account, CheckStatus, Role
-from ..runtime import LIVE_CHAIN, rt
+from ..runtime import rt
 from ..schemas import AccountOut, LoginIn, SignupIn, TokenOut, WalletConnectIn, WalletOut
 from ..services import (
     account_out,
@@ -63,7 +61,6 @@ def login(body: LoginIn, session: Session = Depends(session_dep)) -> TokenOut:
     acct = session.exec(select(Account).where(Account.email == body.email)).first()
     if not acct or not verify_password(body.password, acct.password_hash):
         raise HTTPException(401, "invalid credentials")
-    _normalise_demo_wallet(acct, session)
     return TokenOut(token=issue_token(acct.id, session), account=account_out(acct))
 
 
@@ -106,54 +103,45 @@ def connect_wallet(
     body = body or WalletConnectIn()
     require_devnet_transactions("Wallet connection")
     if acct.xrpl_address:
-        _normalise_demo_wallet(acct, session)
         bal = _rlusd_balance(acct.xrpl_address)
-        if LIVE_CHAIN:
-            acct.wallet_rlusd_balance = bal
-            session.add(acct)
-            session.commit()
+        acct.wallet_rlusd_balance = bal
+        session.add(acct)
+        session.commit()
         return WalletOut(xrpl_address=acct.xrpl_address, provider=acct.wallet_provider or body.provider,
                          rlusd_balance=acct.wallet_rlusd_balance or bal,
                          explorer_url=explorer_account(acct.xrpl_address))
 
-    if LIVE_CHAIN:
-        try:
-            rt.require_live_ready()
-        except RuntimeError as exc:
-            raise HTTPException(503, f"Devnet live mode is not configured: {exc}") from exc
-        from ..xrpl_service import assets
-        from ..xrpl_service.client import fund_wallet, get_client, wallet_from_seed
-        client = get_client()
-        w = fund_wallet(client)
-        trust = assets.create_trustline(w, rt.issuer_address, client)
-        if not trust.ok:
-            raise HTTPException(502, f"TrustSet failed on Devnet: {trust.engine_result}")
+    try:
+        rt.require_live_ready()
+    except RuntimeError as exc:
+        raise HTTPException(503, f"Devnet live mode is not configured: {exc}") from exc
+    from ..xrpl_service import assets
+    from ..xrpl_service.client import fund_wallet, get_client, wallet_from_seed
+    client = get_client()
+    w = fund_wallet(client)
+    trust = assets.create_trustline(w, rt.issuer_address, client)
+    if not trust.ok:
+        raise HTTPException(502, f"TrustSet failed on Devnet: {trust.engine_result}")
+    record_onchain_tx(
+        session,
+        account_id=acct.id,
+        action="wallet_trustline",
+        tx_hash=trust.hash,
+        engine_result=trust.engine_result,
+    )
+    if acct.role == Role.LENDER:
+        mint = assets.mint_rlusd(wallet_from_seed(rt.issuer_seed), w.address, "500000", client)
+        if not mint.ok:
+            raise HTTPException(502, f"RLUSD mint failed on Devnet: {mint.engine_result}")
         record_onchain_tx(
             session,
             account_id=acct.id,
-            action="wallet_trustline",
-            tx_hash=trust.hash,
-            engine_result=trust.engine_result,
+            action="lender_wallet_funding",
+            tx_hash=mint.hash,
+            engine_result=mint.engine_result,
+            amount=500000,
         )
-        if acct.role == Role.LENDER:
-            mint = assets.mint_rlusd(wallet_from_seed(rt.issuer_seed), w.address, "500000", client)
-            if not mint.ok:
-                raise HTTPException(502, f"RLUSD mint failed on Devnet: {mint.engine_result}")
-            record_onchain_tx(
-                session,
-                account_id=acct.id,
-                action="lender_wallet_funding",
-                tx_hash=mint.hash,
-                engine_result=mint.engine_result,
-                amount=500000,
-            )
-        address, seed, balance = w.address, w.seed, _rlusd_balance(w.address)
-    else:
-        address = body.address.strip() or _demo_classic_address()
-        if body.address and not _valid_classic_address(address):
-            raise HTTPException(400, "enter a valid XRPL classic address starting with r")
-        seed = "external-signer" if body.address else "sEd" + _rand_b58(26)
-        balance = 500_000.0 if acct.role == Role.LENDER else 0.0
+    address, seed, balance = w.address, w.seed, _rlusd_balance(w.address)
     set_wallet_connected(session, acct, provider=body.provider, address=address, seed=seed, balance=balance)
     session.commit()
     _ensure_live_borrower_credential(acct, session)
@@ -167,73 +155,8 @@ def me(acct: Account = Depends(current_account)) -> AccountOut:
     return account_out(acct)
 
 
-# --- helpers -----------------------------------------------------------------
-def _rand_b58(n: int) -> str:
-    alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-    return "".join(random.choice(alphabet) for _ in range(n))
-
-
-_XRPL_ALPHABET = "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz"
-
-
-def _b58encode(raw: bytes) -> str:
-    n = int.from_bytes(raw, "big")
-    out = ""
-    while n:
-        n, rem = divmod(n, 58)
-        out = _XRPL_ALPHABET[rem] + out
-    pad = 0
-    for b in raw:
-        if b == 0:
-            pad += 1
-        else:
-            break
-    return _XRPL_ALPHABET[0] * pad + out
-
-
-def _b58decode(value: str) -> bytes:
-    n = 0
-    for ch in value:
-        if ch not in _XRPL_ALPHABET:
-            raise ValueError("invalid base58 character")
-        n = n * 58 + _XRPL_ALPHABET.index(ch)
-    raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
-    pad = len(value) - len(value.lstrip(_XRPL_ALPHABET[0]))
-    return b"\x00" * pad + raw
-
-
-def _checksum(payload: bytes) -> bytes:
-    return hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
-
-
-def _demo_classic_address() -> str:
-    payload = b"\x00" + secrets.token_bytes(20)
-    return _b58encode(payload + _checksum(payload))
-
-
-def _valid_classic_address(address: str) -> bool:
-    if not address.startswith("r"):
-        return False
-    try:
-        raw = _b58decode(address)
-    except ValueError:
-        return False
-    if len(raw) != 25:
-        return False
-    return raw[-4:] == _checksum(raw[:-4]) and raw[0] == 0
-
-
-def _normalise_demo_wallet(acct: Account, session: Session) -> None:
-    if LIVE_CHAIN or not acct.xrpl_address or _valid_classic_address(acct.xrpl_address):
-        return
-    acct.xrpl_address = _demo_classic_address()
-    acct.xrpl_seed = "sEd" + _rand_b58(26)
-    session.add(acct)
-    session.commit()
-
-
 def _ensure_live_borrower_credential(acct: Account, session: Session) -> None:
-    if not LIVE_CHAIN or acct.role != Role.BORROWER:
+    if acct.role != Role.BORROWER:
         return
     if acct.kyc_status != CheckStatus.PASSED or not acct.xrpl_seed or acct.credential_id:
         return
@@ -271,8 +194,6 @@ def _ensure_live_borrower_credential(acct: Account, session: Session) -> None:
 
 
 def _rlusd_balance(address: str) -> float:
-    if not LIVE_CHAIN:
-        return 0.0
     from ..xrpl_service import assets
     from ..xrpl_service.client import get_client
     return assets.rlusd_balance(address, rt.issuer_address, get_client())

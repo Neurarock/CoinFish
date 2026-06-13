@@ -1,6 +1,7 @@
 // CoinFish's operator dashboard. Shows fee revenue, solvency, risk, pool
 // saturation, and loans inside the grace window with a control to extend grace.
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
@@ -32,17 +33,23 @@ export default function VaultDashboard() {
   return (
     <Layout role="admin">
       {d.underwater && <Underwater />}
-      <div className="relative z-10">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="vault-console relative z-10">
+        <div className="vault-hero flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold">CoinFish vault</h1>
-            <p className="mt-1 text-sm" style={{ color: "var(--fg-soft)" }}>
-              Treasury position, liquidity depth, platform fees, and borrower default risk.
+            <div className="vault-kicker">CoinFish command layer</div>
+            <h1 className="text-3xl font-extrabold">Vault operations</h1>
+            <p className="mt-1 max-w-2xl text-sm" style={{ color: "var(--fg-soft)" }}>
+              Devnet treasury control, pool liquidity, protocol fees, and borrower risk signals.
             </p>
           </div>
-          <Pill tone={d.underwater ? "bad" : "good"}>
-            {d.underwater ? "underwater" : "solvent"} · {d.solvency_ratio}×
-          </Pill>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to="/">
+              <Button variant="ghost">Home</Button>
+            </Link>
+            <Pill tone={d.underwater ? "bad" : "good"}>
+              {d.underwater ? "underwater" : "solvent"} · {d.solvency_ratio}×
+            </Pill>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-4">
@@ -53,7 +60,7 @@ export default function VaultDashboard() {
         </div>
 
         <div className="mt-6 grid gap-5 md:grid-cols-3">
-          <div className="card p-5 md:col-span-1">
+          <div className="control-panel p-5 md:col-span-1">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--fg-soft)" }}>
@@ -69,7 +76,7 @@ export default function VaultDashboard() {
           </div>
           <div className="md:col-span-2 grid gap-5 sm:grid-cols-3">
             {d.pools.map((p) => (
-              <div key={p.key} className="card p-4">
+              <div key={p.key} className="control-panel p-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-bold text-sm">{p.name}</div>
                   <Pill tone={p.utilisation > 0.85 ? "bad" : p.utilisation > 0.6 ? "warn" : "good"}>
@@ -93,13 +100,13 @@ export default function VaultDashboard() {
           {d.at_risk_loans.length > 0 && <span className="ml-2"><Pill tone="bad">{d.at_risk_loans.length}</Pill></span>}
         </h2>
         {d.at_risk_loans.length === 0 ? (
-          <div className="card p-5" style={{ color: "var(--fg-soft)" }}>
+          <div className="control-panel p-5" style={{ color: "var(--fg-soft)" }}>
             No active loans are inside the grace/default window.
           </div>
         ) : (
           <div className="space-y-3">
             {d.at_risk_loans.map((l) => (
-              <div key={l.loan_id} className="card p-4"
+              <div key={l.loan_id} className="control-panel p-4"
                 style={{ borderColor: l.in_grace ? "var(--bad)" : "var(--warn)" }}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="font-bold">

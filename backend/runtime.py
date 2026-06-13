@@ -5,14 +5,9 @@ It loads the bootstrap output (vault/broker/domain ids + operator/issuer seeds)
 from a `setup.json` written by scripts/bootstrap_devnet.py (or from env), and
 exposes the per-vault exit queues and the short-lived loan-quote cache.
 
-LIVE_CHAIN toggle
------------------
-The on-chain layer is verified working on Devnet, but live submits take several
-seconds each and need network. For UI development the routers can run in
-off-chain demo mode (LIVE_CHAIN=False, the default), where deposits/loans/repays
-update the SQLite mirror and return synthetic tx hashes, so the whole journey is
-clickable instantly. Flip COINFISH_LIVE_CHAIN=1 to route the same calls through
-xrpl_service against Devnet.
+XRPL Devnet is the only chain mode. Devnet is already the test environment, so
+frontend-driven wallet, vault, loan, repayment, withdrawal, and default actions
+must submit real Devnet transactions and persist real explorer links.
 """
 from __future__ import annotations
 
@@ -27,8 +22,7 @@ from typing import Optional
 from . import config
 from .exit_queue import ExitQueue
 
-LIVE_CHAIN = os.getenv("COINFISH_LIVE_CHAIN", "0") == "1"
-REQUIRE_DEVNET_TRANSACTIONS = os.getenv("COINFISH_REQUIRE_DEVNET_TRANSACTIONS", "1") == "1"
+LIVE_CHAIN = True
 SETUP_PATH = Path(os.getenv("COINFISH_SETUP_JSON", "setup.json"))
 
 
@@ -139,13 +133,8 @@ class Runtime:
         self.quotes[q.id] = q
         return q
 
-    def fake_tx_hash(self) -> str:
-        return uuid.uuid4().hex.upper() + uuid.uuid4().hex.upper()[:32]
-
     def live_warnings(self) -> list[str]:
         warnings: list[str] = []
-        if not LIVE_CHAIN:
-            return warnings
         if not self.issuer_address:
             warnings.append("COINFISH_ISSUER_ADDRESS or setup.json issuer_address is missing")
         if not self.issuer_seed:
@@ -177,17 +166,17 @@ class Runtime:
         warnings = self.live_warnings()
         return {
             "live_chain": LIVE_CHAIN,
-            "requires_devnet_transactions": REQUIRE_DEVNET_TRANSACTIONS,
-            "mode": "xrpl-devnet-live" if LIVE_CHAIN else "local-demo",
-            "devnet_ready": LIVE_CHAIN and not warnings,
+            "requires_devnet_transactions": True,
+            "mode": "xrpl-devnet-live",
+            "devnet_ready": not warnings,
             "warnings": warnings,
-            "issuer_address": self.issuer_address if LIVE_CHAIN else "",
-            "domain_id": self.domain_id if LIVE_CHAIN else "",
+            "issuer_address": self.issuer_address,
+            "domain_id": self.domain_id,
             "pools": [
                 {
                     "key": key,
-                    "vault_id": pool.vault_id if LIVE_CHAIN else "",
-                    "loan_broker_id": pool.loan_broker_id if LIVE_CHAIN else "",
+                    "vault_id": pool.vault_id,
+                    "loan_broker_id": pool.loan_broker_id,
                     "ready": bool(pool.vault_id and pool.loan_broker_id),
                 }
                 for key, pool in self.pools.items()

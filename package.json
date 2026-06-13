@@ -4,10 +4,10 @@
   "version": "0.2.0",
   "scripts": {
     "api": "python3 -m uvicorn backend.main:app --reload --port 8000",
-    "api:devnet": "COINFISH_LIVE_CHAIN=1 python3 -m uvicorn backend.main:app --reload --port 8000",
+    "api:devnet": "python3 -m uvicorn backend.main:app --reload --port 8000",
     "web": "cd frontend && npm run dev -- --host 127.0.0.1",
     "dev": "sh scripts/dev.sh",
-    "dev:devnet": "COINFISH_LIVE_CHAIN=1 sh scripts/dev.sh",
+    "dev:devnet": "sh scripts/dev.sh",
     "build": "cd frontend && npm run build",
     "test:backend": "python3 -m pytest backend/tests",
     "test:frontend": "cd frontend && npm run build",

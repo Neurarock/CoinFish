@@ -1,6 +1,8 @@
-"""End-to-end API smoke test for the local/demo CoinFish UX.
+"""Fast local API smoke test for the CoinFish UX.
 
-Runs entirely in process with FastAPI TestClient and a throwaway SQLite DB.
+Runs entirely in process with FastAPI TestClient and a throwaway SQLite DB. This
+does not disable Devnet or fabricate receipts; it avoids money-moving endpoints
+so every transaction-producing path remains live-only.
 """
 from __future__ import annotations
 
@@ -10,12 +12,10 @@ import time
 from pathlib import Path
 
 os.environ["COINFISH_DB_URL"] = "sqlite:////tmp/coinfish-smoke-local.db"
-os.environ["COINFISH_REQUIRE_DEVNET_TRANSACTIONS"] = "0"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from backend import services  # noqa: E402
 from backend.main import app  # noqa: E402
 
 
@@ -34,6 +34,11 @@ def main() -> None:
     with TestClient(app) as c:
         pools = ok(c.get("/pools"))
         assert len(pools) == 3
+        assert all(p["vault_explorer_url"].startswith("https://devnet.xrpl.org/objects/")
+                   for p in pools)
+
+        status = ok(c.get("/runtime/status"))
+        assert status["mode"] == "xrpl-devnet-live"
 
         lender = ok(c.post("/auth/signup", json={
             "role": "lender",
@@ -45,34 +50,8 @@ def main() -> None:
         }))
         lh = {"Authorization": "Bearer " + lender["token"]}
         ok(c.post("/auth/verify/kyc", headers=lh))
-        wallet = ok(c.post("/auth/wallet/connect", json={"provider": "crossmark"}, headers=lh))
-        assert wallet["provider"] == "crossmark"
-        assert wallet["xrpl_address"].startswith("r")
-        assert wallet["rlusd_balance"] == 500000
-        assert wallet["explorer_url"] == ""
-
-        dep = ok(c.post("/lenders/deposit", json={
-            "pool_key": "low",
-            "amount": 25000,
-        }, headers=lh))
-        assert dep["explorer_url"] == ""
-        assert dep["receipt_url"].startswith("/api/receipts/")
         dash = ok(c.get("/lenders/me/dashboard", headers=lh))
-        assert dash["total_deposited"] == 25000
-
-        wd = ok(c.post("/lenders/withdraw", json={
-            "pool_key": "low",
-            "amount": 5000,
-        }, headers=lh))
-        assert wd["filled"] == 5000
-        assert wd["explorer_urls"] == [""]
-        assert wd["receipt_urls"][0].startswith("/api/receipts/")
-        dash = ok(c.get("/lenders/me/dashboard", headers=lh))
-        assert dash["total_deposited"] == 20000
-
-        services._TOKENS.clear()
-        me = ok(c.get("/auth/me", headers=lh))
-        assert me["wallet_connected"] is True
+        assert dash["total_deposited"] == 0
 
         borrower = ok(c.post("/auth/signup", json={
             "role": "borrower",
@@ -85,7 +64,6 @@ def main() -> None:
         bh = {"Authorization": "Bearer " + borrower["token"]}
         ok(c.post("/auth/verify/kyc", headers=bh))
         ok(c.post("/auth/verify/credit", headers=bh))
-        ok(c.post("/auth/wallet/connect", json={"provider": "xaman"}, headers=bh))
         ok(c.post("/borrowers/collateral/confirm", json={"amount": 100000}, headers=bh))
         quote = ok(c.post("/borrowers/quote", json={
             "pool_key": "low",
@@ -93,13 +71,8 @@ def main() -> None:
             "term_hours": 24,
         }, headers=bh))
         assert quote["approved"] is True
-        loan = ok(c.post("/borrowers/loans/accept", json={
-            "quote_id": quote["id"],
-        }, headers=bh))
-        assert loan["explorer_url"] == ""
-        assert loan["receipt_url"].startswith("/api/receipts/")
         bd = ok(c.get("/borrowers/me/dashboard", headers=bh))
-        assert bd["collateral_available"] == 60000
+        assert bd["collateral_available"] == 100000
 
         vault = ok(c.get("/admin/dashboard"))
         assert "risk_score" in vault

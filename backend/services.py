@@ -16,7 +16,7 @@ from sqlmodel import Session, select
 from . import config
 from . import db
 from .db import Account, AuthSession, CheckStatus, FiatLedger, OnChainTx, Role
-from .runtime import LIVE_CHAIN, REQUIRE_DEVNET_TRANSACTIONS
+from .runtime import LIVE_CHAIN, rt
 from .schemas import AccountOut
 
 # in-memory token store: token -> account_id (demo only)
@@ -123,8 +123,8 @@ def explorer_tx(tx_hash: str) -> str:
     return f"{config.EXPLORER}/transactions/{tx_hash}" if LIVE_CHAIN and tx_hash else ""
 
 
-def receipt_url(receipt_id: str) -> str:
-    return f"/api/receipts/{receipt_id}" if receipt_id and not LIVE_CHAIN else ""
+def explorer_object(object_id: str) -> str:
+    return f"{config.EXPLORER}/objects/{object_id}" if LIVE_CHAIN and object_id else ""
 
 
 def tx_out(row: OnChainTx) -> dict:
@@ -153,29 +153,40 @@ def record_onchain_tx(
     loan_id: int | None = None,
     amount: float = 0.0,
 ) -> OnChainTx:
+    url = explorer_tx(tx_hash)
+    if not tx_hash or not url:
+        raise HTTPException(500, f"Refusing to record non-Devnet transaction for {action}")
     row = OnChainTx(
         account_id=account_id,
         action=action,
         tx_hash=tx_hash,
-        explorer_url=explorer_tx(tx_hash),
+        explorer_url=url,
         engine_result=engine_result,
         pool_key=pool_key,
         loan_id=loan_id,
         amount=round(amount or 0.0, 6),
     )
     session.add(row)
+    session.commit()
+    session.refresh(row)
     return row
 
 
 def require_devnet_transactions(action: str) -> None:
-    if REQUIRE_DEVNET_TRANSACTIONS and not LIVE_CHAIN:
+    if not LIVE_CHAIN:
         raise HTTPException(
             status_code=503,
             detail=(
-                f"{action} must be submitted on XRPL Devnet. Start the backend with "
-                "COINFISH_LIVE_CHAIN=1 after running bootstrap_devnet.py. For local "
-                "developer-only tests set COINFISH_REQUIRE_DEVNET_TRANSACTIONS=0."
+                f"{action} must be submitted on XRPL Devnet. Run "
+                "python3 -m backend.scripts.bootstrap_devnet and start the backend again."
             ),
+        )
+    warnings = rt.live_warnings()
+    if warnings:
+        raise HTTPException(
+            status_code=503,
+            detail=f"{action} cannot be submitted until Devnet setup is complete: "
+                   + "; ".join(warnings),
         )
 
 

@@ -23,7 +23,6 @@ export default function LenderDeposit() {
         text: `Deposited. Wallet balance ${rlusd(r.wallet_balance)}.`,
         tx_hash: r.tx_hash,
         explorer_url: r.explorer_url,
-        receipt_url: r.receipt_url,
       });
       load();
     } catch (e) { setMsg({ error: e.message }); }
@@ -58,6 +57,10 @@ export default function LenderDeposit() {
             <Row k="First-loss buffer" v={pct(p.first_loss_buffer)} />
             <Row k="First-loss capital" v={rlusd(p.first_loss_capital)} />
             <Row k="Idle / available" v={rlusd(p.available)} />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <VerifyLink href={p.vault_explorer_url} hash={p.vault_id} label="Verify vault" />
+              <VerifyLink href={p.loan_broker_explorer_url} hash={p.loan_broker_id} label="Verify broker" />
+            </div>
             <Button variant={sel === p.key ? "primary" : "ghost"} className="mt-3 w-full justify-center"
               onClick={() => setSel(p.key)}>
               {sel === p.key ? "Selected" : "Select pool"}
@@ -81,9 +84,9 @@ export default function LenderDeposit() {
             <div className="mt-3 text-sm" style={{ color: msg.error ? "var(--bad)" : "var(--accent)" }}>
               {msg.error || msg.text}
               <VerifyLink
-                href={msg.explorer_url || msg.receipt_url}
+                href={msg.explorer_url}
                 hash={msg.tx_hash}
-                label={msg.explorer_url ? "Verify on XRPL" : "Demo receipt"}
+                label="Verify on XRPL"
               />
             </div>
           )}

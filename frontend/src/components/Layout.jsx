@@ -62,7 +62,7 @@ export default function Layout({ role, children }) {
           {status && (
             <span className="ml-2 hidden sm:inline-flex" title={status.warnings?.join("\n") || status.mode}>
               <Pill tone={status.live_chain ? (status.devnet_ready ? "good" : "warn") : "muted"}>
-                {status.live_chain ? "XRPL Devnet" : "Local demo"}
+                {status.devnet_ready ? "XRPL Devnet" : "Devnet setup"}
               </Pill>
             </span>
           )}

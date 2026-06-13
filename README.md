@@ -38,12 +38,22 @@ SPEC.md                full spec
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
 
-# stand up the on-chain world on Devnet (prints seeds to save into .env)
+# 1. Verify every transaction builds, validates & signs — NO network needed
+python -m backend.scripts.validate_offline
+
+# 2. Full live lifecycle on Devnet (needs open internet)
+python -m backend.scripts.run_demo
+
+# or just stand up the 3 pools and capture seeds/ids for .env
 python -m backend.scripts.bootstrap_devnet
 
 # run the API
 uvicorn backend.main:app --reload
 ```
+
+> **Network note:** the lending amendment is Devnet-only, and Devnet is reachable
+> over normal internet. `validate_offline.py` proves construction/signing offline;
+> `run_demo.py` / `bootstrap_devnet.py` must run on a machine with internet access.
 
 ## Pools (MVP)
 | Pool | Risk | First-loss buffer | Base APR |

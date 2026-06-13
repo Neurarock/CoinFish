@@ -18,7 +18,7 @@ from xrpl.models.transactions import (
     CredentialCreate,
     PermissionedDomainSet,
 )
-from xrpl.models.transactions.permissioned_domain_set import Credential as AcceptedCredential
+from xrpl.models.transactions.deposit_preauth import Credential as AcceptedCredential
 from xrpl.utils import str_to_hex
 from xrpl.wallet import Wallet
 

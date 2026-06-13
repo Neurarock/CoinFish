@@ -39,6 +39,17 @@ def create_trustline(
     return submit(tx, holder, client=client)
 
 
+def rlusd_balance(address: str, issuer_address: str, client: JsonRpcClient) -> float:
+    """Read an account's RLUSD balance from its trust lines (0.0 if none)."""
+    from xrpl.models.requests import AccountLines
+
+    lines = client.request(AccountLines(account=address)).result.get("lines", [])
+    for ln in lines:
+        if ln.get("currency") == config.STABLECOIN_HEX and ln.get("account") == issuer_address:
+            return float(ln.get("balance", "0"))
+    return 0.0
+
+
 def mint_rlusd(
     issuer: Wallet, destination: str, value: str | float, client: JsonRpcClient
 ) -> TxResult:

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from xrpl.clients import JsonRpcClient
-from xrpl.transaction import autofill_and_sign, submit_and_wait
+from xrpl.transaction import submit_and_wait
 from xrpl.wallet import Wallet, generate_faucet_wallet
 
 from .. import config
@@ -43,6 +43,23 @@ def submit(tx, *wallets: Wallet, client: JsonRpcClient | None = None) -> TxResul
     client = client or get_client()
     submitter = wallets[0]
     response = submit_and_wait(tx, client, submitter)
+    result = response.result
+    meta = result.get("meta", {})
+    engine = meta.get("TransactionResult", "") if isinstance(meta, dict) else ""
+    return TxResult(
+        ok=response.is_successful(),
+        hash=result.get("hash", ""),
+        engine_result=engine,
+        raw=result,
+    )
+
+
+def submit_signed(tx, *, client: JsonRpcClient | None = None) -> TxResult:
+    """Submit an already-signed transaction (e.g. a co-signed LoanSet) and wait."""
+    client = client or get_client()
+    # no wallet + no autofill/check_fee: the tx already carries both signatures,
+    # so we must not mutate it (that would invalidate the co-signature).
+    response = submit_and_wait(tx, client, autofill=False, check_fee=False)
     result = response.result
     meta = result.get("meta", {})
     engine = meta.get("TransactionResult", "") if isinstance(meta, dict) else ""

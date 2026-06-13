@@ -1,17 +1,20 @@
-// Borrower dashboard: how much borrowed, interest paid, outstanding, plus a clear
-// itemised bill. Per active loan you can repay interest-only, repay in full (with
-// a min-term warning before the term elapses), or default (forfeit collateral +
-// a clearly-shown default charge).
+// Borrower dashboard: how much borrowed, interest paid, outstanding, an itemised
+// bill, and a wallet panel to RECEIVE RLUSD (QR, like the fiat top-up) so the
+// borrower can fund repayments. Per active loan you can repay interest-only,
+// repay ALL early (principal + interest up to the minimum term), or default.
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import TxLedger from "../components/TxLedger.jsx";
-import { Button, Stat, Pill, VerifyLink, rlusd, gbp, pct } from "../components/ui.jsx";
+import QrCode from "../components/QrCode.jsx";
+import { useTx } from "../components/TxProcessing.jsx";
+import { Button, Stat, Pill, VerifyLink, rlusd, usd, pct } from "../components/ui.jsx";
 
 export default function BorrowerDashboard() {
   const [d, setD] = useState(null);
   const [msg, setMsg] = useState(null);
   const [txs, setTxs] = useState([]);
+  const { track } = useTx();
 
   const load = () => {
     api.borrowerDashboard().then(setD);
@@ -19,17 +22,11 @@ export default function BorrowerDashboard() {
   };
   useEffect(() => { load(); }, []);
 
-  async function act(fn, loanId) {
+  async function act(promise, loanId, meta) {
     setMsg(null);
     try {
-      const r = await fn();
-      setMsg({
-        loanId,
-        text: summarise(r),
-        tone: "good",
-        tx_hash: r.tx_hash,
-        explorer_url: r.explorer_url,
-      });
+      const r = await track(promise, meta);
+      setMsg({ loanId, text: summarise(r), tone: "good", tx_hash: r.tx_hash, explorer_url: r.explorer_url });
       load();
     } catch (e) { setMsg({ loanId, text: e.message, tone: "bad" }); }
   }
@@ -38,13 +35,17 @@ export default function BorrowerDashboard() {
 
   return (
     <Layout role="borrower">
-      <h1 className="text-3xl font-extrabold">Borrowing dashboard</h1>
+      <h1 className="text-3xl font-extrabold">
+        <span className="morph-text">Borrowing dashboard</span>
+      </h1>
       <div className="mt-5 grid gap-4 sm:grid-cols-4">
         <Stat label="Total borrowed" value={rlusd(d.total_borrowed)} />
         <Stat label="Outstanding" value={rlusd(d.outstanding)} accent />
         <Stat label="Interest paid" value={rlusd(d.interest_paid)} />
-        <Stat label="Available collateral" value={gbp(d.collateral_available)} />
+        <Stat label="Available collateral" value={usd(d.collateral_available)} />
       </div>
+
+      <ReceiveWallet account={d.account} />
 
       {/* itemised bill */}
       <div className="card mt-6 p-5">
@@ -74,26 +75,38 @@ export default function BorrowerDashboard() {
               pool {l.pool_key} · interest paid {rlusd(l.interest_paid)}
               {l.default_charge > 0 && <> · default charge {rlusd(l.default_charge)}</>}
             </div>
-            <VerifyLink
-              href={l.origination_explorer_url}
-              hash={l.origination_tx}
-              label="Verify origination on XRPL"
-            />
-            <VerifyLink
-              href={l.loan_explorer_url}
-              hash={l.xrpl_loan_id}
-              label="Verify loan object"
-            />
+            <VerifyLink href={l.origination_explorer_url} hash={l.origination_tx} label="Verify origination on XRPL" />
+            <VerifyLink href={l.loan_explorer_url} hash={l.xrpl_loan_id} label="Verify loan object" />
+
+            {l.status === "active" && l.payoff && (
+              <div className="mt-3 rounded-xl p-3 text-xs" style={{ background: "var(--bg)", border: "1px solid var(--line)" }}>
+                <span className="font-bold" style={{ color: "var(--accent)" }}>Pay it all off: {rlusd(l.payoff.payoff_now)}</span>
+                {" "}— principal {rlusd(l.principal)} + interest {rlusd(l.payoff.interest_due_now)}.
+                {l.payoff.is_early
+                  ? ` Early close still covers interest to the ${l.payoff.min_term_hours}h minimum term.`
+                  : ` Interest accrued so far (${l.payoff.elapsed_hours}h held).`}
+              </div>
+            )}
+
             {l.status === "active" && (
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button variant="ghost" onClick={() => act(() => api.repay(l.id, { mode: "interest" }), l.id)}>
+                <Button variant="ghost" onClick={() => act(
+                  api.repay(l.id, { mode: "interest" }), l.id,
+                  { title: "Paying interest", steps: ["Building LoanPay", "Signing", "Submitting to XRPL", "Confirming"], success: "Interest paid" },
+                )}>
                   Repay interest
                 </Button>
-                <Button onClick={() => act(() => api.repay(l.id, { mode: "full" }), l.id)}>
-                  Repay in full
+                <Button onClick={() => act(
+                  api.repay(l.id, { mode: "full" }), l.id,
+                  { title: "Repaying loan in full", steps: ["Computing payoff to min term", "Building LoanPay", "Submitting to XRPL", "Releasing collateral"], success: "Loan repaid in full" },
+                )}>
+                  {l.payoff ? `Repay all early · ${rlusd(l.payoff.payoff_now)}` : "Repay all early"}
                 </Button>
                 <Button variant="ghost" className="ml-auto"
-                  onClick={() => act(() => api.defaultLoan(l.id), l.id)}
+                  onClick={() => act(
+                    api.defaultLoan(l.id), l.id,
+                    { title: "Processing default", steps: ["Flagging loan", "LoanManage default", "Drawing first-loss cover", "Seizing collateral"], success: "Default processed" },
+                  )}
                   style={{ color: "var(--bad)", borderColor: "var(--bad)" }}>
                   Default
                 </Button>
@@ -102,11 +115,7 @@ export default function BorrowerDashboard() {
             {msg?.loanId === l.id && (
               <div className="mt-2 text-sm" style={{ color: `var(--${msg.tone})` }}>
                 {msg.text}
-                <VerifyLink
-                  href={msg.explorer_url}
-                  hash={msg.tx_hash}
-                  label="Verify on XRPL"
-                />
+                <VerifyLink href={msg.explorer_url} hash={msg.tx_hash} label="Verify on XRPL" />
               </div>
             )}
           </div>
@@ -117,9 +126,85 @@ export default function BorrowerDashboard() {
   );
 }
 
+// Receive RLUSD into the connected wallet — same QR pattern as the fiat top-up,
+// but on the XRPL side, so the borrower can fund repayments.
+function ReceiveWallet({ account }) {
+  const [open, setOpen] = useState(false);
+  const [info, setInfo] = useState(null);
+  const [amount, setAmount] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function show() {
+    setErr("");
+    try {
+      const r = await api.receiveRlusd({ amount: Number(amount) || 0 });
+      setInfo(r);
+      setOpen(true);
+    } catch (e) { setErr(e.message); }
+  }
+  function copy() {
+    navigator.clipboard?.writeText(info?.xrpl_address || account.xrpl_address || "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <div className="morph-edge mt-6 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="font-bold">Wallet</div>
+          <div className="text-xs" style={{ color: "var(--fg-soft)" }}>
+            {account.xrpl_address
+              ? <>{account.xrpl_address.slice(0, 12)}…{account.xrpl_address.slice(-6)}</>
+              : "No wallet connected"}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Pill tone="good">{rlusd(account.wallet_rlusd_balance)}</Pill>
+          <Button variant={open ? "ghost" : "primary"} onClick={() => (open ? setOpen(false) : show())}>
+            {open ? "Hide" : "Receive RLUSD"}
+          </Button>
+        </div>
+      </div>
+
+      {err && <div className="mt-2 text-sm" style={{ color: "var(--bad)" }}>{err}</div>}
+
+      {open && info && (
+        <div className="mt-4 flex flex-wrap items-start gap-5">
+          <QrCode payload={info.qr_payload} />
+          <div className="text-sm space-y-2">
+            <div className="flex items-end gap-2">
+              <label>
+                <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Request amount (RLUSD, optional)</span>
+                <input className="input mt-1 w-44" type="number" value={amount}
+                  onChange={(e) => setAmount(e.target.value)} />
+              </label>
+              <Button variant="ghost" onClick={show}>Update QR</Button>
+            </div>
+            <Detail k="Network" v="XRPL Devnet" />
+            <Detail k="Asset" v={info.currency} />
+            <Detail k="Send to" v={`${info.xrpl_address.slice(0, 16)}…${info.xrpl_address.slice(-6)}`} />
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={copy}>{copied ? "Copied ✓" : "Copy address"}</Button>
+              <VerifyLink href={info.explorer_url} label="View account on XRPL" />
+            </div>
+            <div className="text-xs" style={{ color: "var(--fg-soft)" }}>
+              Scan to send RLUSD to your wallet, then repay your loans below.
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function summarise(r) {
   if (r.mode === "interest") return `Interest paid: ${rlusd(r.interest_paid)}.`;
-  if (r.mode === "full") return `Loan repaid in full. Collateral released.`;
+  if (r.mode === "full") {
+    const tag = r.early ? ` (early — interest to ${r.min_term_hours}h minimum term)` : "";
+    return `Loan repaid in full: ${rlusd(r.payoff_total)}${tag}. Collateral released.`;
+  }
   if (r.status === "defaulted") return `Defaulted. Collateral seized ${rlusd(r.collateral_seized)} (incl. ${rlusd(r.default_charge)} charge).`;
   return "Done.";
 }
@@ -131,6 +216,14 @@ function Bill({ k, v, tone }) {
     <div className="rounded-xl p-3" style={{ background: "var(--bg)" }}>
       <div className="text-xs" style={{ color: "var(--fg-soft)" }}>{k}</div>
       <div className="font-bold" style={{ color: tone ? `var(--${tone})` : "var(--fg)" }}>{v}</div>
+    </div>
+  );
+}
+function Detail({ k, v }) {
+  return (
+    <div className="flex justify-between gap-6">
+      <span style={{ color: "var(--fg-soft)" }}>{k}</span>
+      <span className="font-bold">{v}</span>
     </div>
   );
 }

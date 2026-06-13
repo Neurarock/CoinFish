@@ -8,11 +8,16 @@ import { useAuth } from "../store.jsx";
 import { api } from "../api.js";
 import { Button, Field, Pill, VerifyLink, rlusd } from "../components/ui.jsx";
 import CheckButton from "../components/CheckButton.jsx";
+import DevnetBadge from "../components/DevnetBadge.jsx";
+import Footer from "../components/Footer.jsx";
+import Logo from "../components/Logo.jsx";
+import { useTx } from "../components/TxProcessing.jsx";
 
 const THEME = { lender: "theme-lender", borrower: "theme-borrower" };
 
 export default function Landing() {
   const { login, patchAccount, account } = useAuth();
+  const { track } = useTx();
   const nav = useNavigate();
   const [role, setRole] = useState("lender");
   const [mode, setMode] = useState("signup");
@@ -54,7 +59,19 @@ export default function Landing() {
     } catch (e) { setErr(e.message); }
   }
   async function connect() {
-    const w = await api.connectWallet({ provider: walletChoice, address: walletAddress });
+    setErr("");
+    let w;
+    try {
+      w = await track(
+        api.connectWallet({ provider: walletChoice, address: walletAddress }),
+        {
+          title: "Connecting your XRPL wallet",
+          steps: ["Opening " + walletChoice + " signer", "Requesting signature",
+                  "Verifying account on Devnet", "Reading RLUSD balance"],
+          success: "Wallet connected",
+        },
+      );
+    } catch (e) { setErr(e.message); return; }
     setWallet(w);
     const next = {
       ...acct,
@@ -75,19 +92,23 @@ export default function Landing() {
   return (
     <div className={`app-bg ${THEME[role]} min-h-screen flex flex-col`}>
       <div className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-2 text-xl font-extrabold">
-          <span className="brand-mark">CF</span> CoinFish
+        <div className="flex items-center gap-3 text-xl font-extrabold">
+          <Logo size={68} to="/" /> CoinFish
         </div>
-        <a href="/vault" className="text-sm font-semibold" style={{ color: "var(--fg-soft)" }}>
-          CoinFish vault ↗
-        </a>
+        <div className="flex items-center gap-3">
+          <a href="/vault" className="text-sm font-semibold" style={{ color: "var(--fg-soft)" }}>
+            CoinFish vault ↗
+          </a>
+          <DevnetBadge />
+        </div>
       </div>
 
       <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-10 px-6 py-8 md:grid-cols-2">
         {/* pitch side */}
         <div className="space-y-4">
           <h1 className="text-4xl font-extrabold leading-tight">
-            Fiat-rich, crypto-poor?<br />Borrow on-chain in seconds.
+            Fiat-rich, crypto-poor?<br />
+            <span className="morph-text">Borrow on-chain in seconds.</span>
           </h1>
           <p style={{ color: "var(--fg-soft)" }}>
             Lenders supply RLUSD into risk-tiered pools and earn yield. Borrowers post
@@ -151,6 +172,7 @@ export default function Landing() {
           {err && <div className="mt-3 text-sm" style={{ color: "var(--bad)" }}>{err}</div>}
         </div>
       </div>
+      <Footer />
     </div>
   );
 

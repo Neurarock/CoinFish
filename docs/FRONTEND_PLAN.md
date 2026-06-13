@@ -1,11 +1,16 @@
 # CoinFish — Frontend Plan (M6)
 
 The frontend is three role-themed worlds over one FastAPI backend: **Lender**
-(bright white), **Borrower** (crisp black), and the **CoinFish Vault** (swimming-
-pool blue). The product metaphor is *fish in a pool*: liquidity is water, pools
-are tanks, utilisation is the water level, and the platform is "buoyant" or
-"underwater". The visual language is playful but the copy and risk disclosures
-are professional.
+(bright white, **purple** accent), **Borrower** (crisp black, cyan accent), and
+the **CoinFish Vault** (deep ink, **pink** accent). The product metaphor is *fish
+in a pool*: liquidity is water, pools are tanks, utilisation is the water level,
+and the platform is "buoyant" or "underwater". The visual language is playful but
+the copy and risk disclosures are professional. Shared "expensive" touches — a
+slowly morphing gradient on headlines/edges/buttons, a live animated **Devnet
+badge** (top-right, links to the XRPL Devnet explorer), an on-chain **processing
+overlay**, the `logo.png` brand mark (also the favicon), and a global footer
+(GitHub repo, demo-only Terms of Service, "Built by Team 5 for UK Finnovator ·
+Ripple Track @ 2026") — run across all three worlds.
 
 Stack: **Vite + React 18 + Tailwind**, React Router, a thin `fetch` API client.
 Theming is CSS-variable based so one component set renders correctly in all three
@@ -18,9 +23,9 @@ worlds. This document is the design spec; the scaffold that implements it lives 
 
 | World | Route prefix | Palette | Feel |
 |---|---|---|---|
-| **Lender** | `/lender/*` | bright white, sky-blue accent | airy, liquid, safe |
+| **Lender** | `/lender/*` | bright white, purple accent | airy, liquid, safe |
 | **Borrower** | `/borrower/*` | pure black, cyan accent | fast, sharp, high-contrast |
-| **CoinFish Vault** | `/vault` | pool blue, yellow accent | the operator's control room |
+| **CoinFish Vault** | `/vault` | deep ink, pink accent | the operator's control room |
 
 Each palette is a set of CSS variables (`--bg`, `--fg`, `--accent`, `--water-top`,
 `--water-bot`, `--good/--warn/--bad`, …) declared in `src/index.css` under
@@ -106,7 +111,7 @@ filled withdrawals, your yield, and a **withdraw** input. Withdraw outcomes:
 - **Settles immediately** (green) when idle liquidity covers it.
 - **Queued / partial** (amber) when the pool is heavily lent out — the message
   explains the remainder is parked in a fair FIFO queue and drains as loans repay,
-  within one 24h term. An **Exit queue** table lists each request's filled amount
+  within one loan term. An **Exit queue** table lists each request's filled amount
   and status (pending / partial / filled).
 
 ### 3.4 Borrower · Collateral (`pages/BorrowerCollateral.jsx`)
@@ -118,25 +123,28 @@ payload — no external lib). "I've sent the transfer" credits the fiat ledger.
 level directly changes which pools the borrower is eligible for.
 
 ### 3.5 Borrower · Borrow (`pages/BorrowerBorrow.jsx`)
-Cards for each pool tagged **eligible / not eligible** based on available
-collateral and current LTV, showing from-APR, max borrow, current LTV, pool
-liquidity. Pick an eligible pool, enter amount + term (≤24h), **Request quote**.
-The quote is **live for 5 seconds**: a circular countdown ring runs down; **Accept**
-within the window disburses RLUSD to the connected wallet (shows the highlighted
-XRPL explorer verification link and records the XRPL loan object for later
-verification, then routes to the dashboard). After 0s the button flips to
-"Expired — re-quote".
+The borrower enters an amount **once** and `POST /borrowers/quotes` quotes **every
+pool at the same time** so they can shop around. Each pool uses its own default
+term (Conservative 24h / Balanced 48h / High-Yield 72h), so rate and total
+interest differ side by side. **Eligible** pools render a live (5-second) quote
+card with a circular countdown ring + **Accept**; accepting disburses RLUSD to the
+connected wallet via the processing overlay, shows the XRPL explorer link, records
+the loan object, and routes to the dashboard. **Ineligible** pools render a polite
+"thank you" card with the specific reason (KYC pending, no headroom, pool fully
+utilised, …) instead of a dead button.
 
 ### 3.6 Borrower · Dashboard (`pages/BorrowerDashboard.jsx`)
-Stats: total borrowed, outstanding, interest paid, available collateral. An itemised
-**bill** (interest paid, origination fees, default charges, owed now). Per active
-loan: **Repay interest** (interest-only), **Repay in full** (blocked with a clear
-min-term warning if the loan hasn't been held long enough), and **Default** (forfeit
-collateral + a clearly-shown default charge, then the loan is marked defaulted and
-the charge appears in the bill).
+Stats: total borrowed, outstanding, interest paid, available collateral. A **Wallet**
+panel with the connected balance and a **Receive RLUSD** button that shows a QR of
+the wallet address (same pattern as the fiat top-up) so the borrower can fund
+repayments. An itemised **bill**. Per active loan: **Repay interest** (interest-only),
+**Repay all early** — full payoff allowed at any time, priced as principal + interest
+up to the minimum term so lenders keep their committed yield (the amount is shown
+on the button) — and **Default** (forfeit collateral + a clearly-shown default
+charge). Every on-chain action runs through the processing overlay.
 
 ### 3.7 CoinFish · Vault dashboard (`pages/VaultDashboard.jsx`)
-The operator control room, pool-blue but restrained. Stats: **fees collected**,
+The operator control room, pink but restrained. Stats: **fees collected**,
 total TVL, out on loan, first-loss capital. A solvency pill (**solvent** vs
 **underwater**, with the solvency ratio); when underwater a subtle liquidity-pressure
 overlay appears behind the page. A **risk-score** half-gauge (0–100,
@@ -152,11 +160,15 @@ The page polls every 5s so it feels live.
 
 | Component | Role |
 |---|---|
-| `components/Layout.jsx` | Applies the role theme + renders nav; wraps every authed page. |
+| `components/Layout.jsx` | Applies the role theme + renders the airy nav + footer; wraps every authed page. |
 | `components/PoolWater.jsx` | The animated water-level tank (utilisation gauge). |
 | `components/CheckButton.jsx` | Orange→green KYC / credit-check button. |
-| `components/QrCode.jsx` | Self-contained deterministic QR for the fiat top-up. |
-| `components/ui.jsx` | Atoms: `Button`, `Field`, `Stat`, `Pill`, money/percent format helpers. |
+| `components/QrCode.jsx` | Self-contained deterministic QR (fiat top-up + Receive RLUSD). |
+| `components/TxProcessing.jsx` | `TxProvider` + `useTx().track(promise, …)`: the animated on-chain processing overlay shown during every wallet/loan action. |
+| `components/DevnetBadge.jsx` | Live animated "XRPL Devnet" badge linking to the Devnet explorer. |
+| `components/Logo.jsx` | `logo.png` brand mark (transparent bg); optional home link. |
+| `components/Footer.jsx` | GitHub repo + logo, demo-only Terms of Service, Team 5 credit. |
+| `components/ui.jsx` | Atoms: `Button`, `Field`, `Stat`, `Pill`, money (`usd`/`rlusd`)/percent helpers. |
 | `store.jsx` | Auth/session context (account, token, login/logout). |
 | `api.js` | Typed-ish fetch client for every backend endpoint. |
 

@@ -2,13 +2,14 @@
 // team / event credit. The top edge is a slowly morphing gradient rule so the
 // footer reads as part of the same "expensively made" system as the rest.
 import { useState } from "react";
+import Logo from "./Logo.jsx";
 
 const REPO = "https://github.com/Neurarock/CoinFish";
 
 export default function Footer() {
   const [terms, setTerms] = useState(false);
   return (
-    <footer className="mt-16">
+    <footer className="relative z-10 mt-16">
       <hr className="morph-rule" />
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-7 text-sm
                       md:flex-row md:items-center md:justify-between"
@@ -32,7 +33,7 @@ export default function Footer() {
               Terms of Service
             </button>
             <span className="mx-2">·</span>
-            <span>🐟 CoinFish</span>
+            <span className="inline-flex items-center gap-1"><Logo size={16} aura={false} /> CoinFish</span>
           </div>
         </div>
       </div>

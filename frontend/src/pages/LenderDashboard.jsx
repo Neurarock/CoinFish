@@ -6,6 +6,7 @@ import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
 import TxLedger from "../components/TxLedger.jsx";
+import { useTx } from "../components/TxProcessing.jsx";
 import { Button, Stat, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
 
 export default function LenderDashboard() {
@@ -13,6 +14,7 @@ export default function LenderDashboard() {
   const [wd, setWd] = useState({});
   const [msg, setMsg] = useState(null);
   const [txs, setTxs] = useState([]);
+  const { track } = useTx();
 
   const load = () => {
     api.lenderDashboard().then(setD);
@@ -23,7 +25,14 @@ export default function LenderDashboard() {
   async function withdraw(pool_key) {
     setMsg(null);
     try {
-      const r = await api.withdraw({ pool_key, amount: Number(wd[pool_key] || 0) });
+      const r = await track(
+        api.withdraw({ pool_key, amount: Number(wd[pool_key] || 0) }),
+        {
+          title: "Withdrawing from the vault",
+          steps: ["Checking idle liquidity", "Building VaultWithdraw", "Submitting to XRPL", "Settling to your wallet"],
+          success: "Withdrawal processed",
+        },
+      );
       setMsg({ pool_key, ...r });
       load();
     } catch (e) { setMsg({ pool_key, error: e.message }); }

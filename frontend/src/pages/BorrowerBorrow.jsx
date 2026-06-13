@@ -1,147 +1,188 @@
-// Borrower borrow screen. Shows pools the borrower is eligible for (from their
-// collateral + current LTV), lets them request a quote for an amount + term, and
-// the quote is LIVE FOR 5 SECONDS — a countdown ring runs; accept within the
-// window disburses the loan to the connected wallet, else it expires.
+// Borrower borrow screen. The borrower enters an amount once and CoinFish quotes
+// EVERY pool at the same time so they can shop around — each pool uses its own
+// default term (Conservative 24h / Balanced 48h / High-Yield 72h), so the rate
+// and total interest differ and the trade-off is visible side by side.
+//
+// Eligible pools show a live (5s) quote with a countdown ring + Accept button.
+// Ineligible pools show the reason and a friendly "thank you" card instead.
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
+import { useTx } from "../components/TxProcessing.jsx";
 import { Button, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
 
+const QUOTE_WINDOW = 5; // seconds a quote stays live
+
 export default function BorrowerBorrow() {
-  const [d, setD] = useState(null);
-  const [pool, setPool] = useState(null);
   const [amount, setAmount] = useState(20000);
-  const [term, setTerm] = useState(12);
-  const [quote, setQuote] = useState(null);
-  const [left, setLeft] = useState(0);
+  const [data, setData] = useState(null);   // { amount, quotes: [...] }
+  const [now, setNow] = useState(Date.now() / 1000);
   const [msg, setMsg] = useState(null);
+  const [loading, setLoading] = useState(false);
   const timer = useRef(null);
   const nav = useNavigate();
+  const { track } = useTx();
 
-  useEffect(() => { api.borrowerDashboard().then(setD); }, []);
+  // a single ticking clock drives every card's countdown
+  useEffect(() => {
+    timer.current = setInterval(() => setNow(Date.now() / 1000), 100);
+    return () => clearInterval(timer.current);
+  }, []);
 
-  function startCountdown(secs) {
-    clearInterval(timer.current);
-    const end = Date.now() + secs * 1000;
-    timer.current = setInterval(() => {
-      const s = Math.max(0, (end - Date.now()) / 1000);
-      setLeft(s);
-      if (s <= 0) clearInterval(timer.current);
-    }, 100);
-  }
-
-  async function getQuote() {
+  async function getQuotes() {
     setMsg(null);
+    setLoading(true);
     try {
-      const q = await api.quote({ pool_key: pool, amount: Number(amount), term_hours: Number(term) });
-      setQuote(q);
-      startCountdown(q.seconds_left);
+      const r = await api.quotesAll({ amount: Number(amount) });
+      setData(r);
     } catch (e) { setMsg({ error: e.message }); }
+    finally { setLoading(false); }
   }
 
-  async function accept() {
+  async function accept(q) {
     setMsg(null);
     try {
-      const r = await api.acceptQuote({ quote_id: quote.id });
+      const r = await track(
+        api.acceptQuote({ quote_id: q.id }),
+        {
+          title: "Originating your loan",
+          steps: ["Broker co-signs LoanSet", "You co-sign", "Submitting to XRPL",
+                  "Disbursing RLUSD to your wallet"],
+          success: "Loan disbursed",
+        },
+      );
       setMsg({
         text: `Disbursed ${rlusd(r.principal)} to ${r.disbursed_to.slice(0, 12)}…. Wallet balance ${rlusd(r.wallet_balance)}.`,
         tx_hash: r.tx_hash,
         explorer_url: r.explorer_url,
       });
-      setQuote(null);
+      setData(null);
       setTimeout(() => nav("/borrower/dashboard"), 1200);
     } catch (e) { setMsg({ error: e.message }); }
   }
 
-  if (!d) return <Layout role="borrower"><div>Loading…</div></Layout>;
-  const expired = quote && left <= 0;
+  const eligible = (data?.quotes || []).filter((q) => q.eligible && q.quote);
+  const blocked = (data?.quotes || []).filter((q) => !(q.eligible && q.quote));
 
   return (
     <Layout role="borrower">
-      <h1 className="text-3xl font-extrabold">Borrow</h1>
+      <h1 className="text-3xl font-extrabold">
+        <span className="morph-text">Borrow</span>
+      </h1>
       <p className="mt-1 mb-6" style={{ color: "var(--fg-soft)" }}>
-        Eligibility is set by your available collateral and current loan-to-value. Quotes are
-        live for 5 seconds — accept fast and the loan lands in your wallet in seconds.
+        Enter an amount and we quote every pool at once. Each pool commits for a
+        different term — longer terms are cheaper, shorter terms are more flexible —
+        so it pays to shop around. Quotes are live for {QUOTE_WINDOW} seconds.
       </p>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {d.eligible_pools.map((p) => (
-          <div key={p.key}
-            className="card p-4 text-left"
-            style={{ outline: pool === p.key ? "2px solid var(--accent)" : "none" }}>
-            <div className="flex items-center justify-between">
-              <div className="font-bold">{p.name}</div>
-              <Pill tone={p.eligible ? "good" : "muted"}>{p.eligible ? "eligible" : "not eligible"}</Pill>
-            </div>
-            <Row k="From APR" v={pct(p.base_apr)} />
-            <Row k="Max borrow" v={rlusd(p.max_borrow)} />
-            <Row k="Current LTV" v={pct(p.current_ltv)} />
-            <Row k="Pool liquidity" v={rlusd(p.available_liquidity)} />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <VerifyLink href={p.vault_explorer_url} hash={p.vault_id} label="Verify vault" />
-              <VerifyLink href={p.loan_broker_explorer_url} hash={p.loan_broker_id} label="Verify broker" />
-            </div>
-            <Button
-              variant={pool === p.key ? "primary" : "ghost"}
-              className="mt-3 w-full justify-center"
-              disabled={!p.eligible}
-              onClick={() => setPool(p.key)}
-            >
-              {p.eligible ? (pool === p.key ? "Selected" : "Select pool") : "Not eligible"}
-            </Button>
-          </div>
-        ))}
+      <div className="card p-5">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex-1">
+            <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Amount (RLUSD)</span>
+            <input className="input mt-1" type="number" value={amount}
+              onChange={(e) => setAmount(e.target.value)} />
+          </label>
+          <Button onClick={getQuotes} disabled={loading}>
+            {loading ? "Quoting…" : data ? "Re-quote all pools" : "Get quotes from all pools"}
+          </Button>
+        </div>
       </div>
 
-      {pool && (
-        <div className="card mt-6 p-5">
-          <div className="font-bold">Request a quote</div>
-          <div className="mt-3 flex flex-wrap items-end gap-3">
-            <Num label="Amount (RLUSD)" value={amount} onChange={setAmount} />
-            <Num label="Term (hours, max 24)" value={term} onChange={setTerm} />
-            <Button onClick={getQuote}>Request quote</Button>
+      {eligible.length > 0 && (
+        <>
+          <h2 className="mt-8 mb-3 text-xl font-bold">Your offers · shop around</h2>
+          <div className="grid gap-5 md:grid-cols-3">
+            {eligible.map((p) => (
+              <QuoteCard key={p.pool_key} p={p} left={leftFor(p.quote, now)} onAccept={() => accept(p.quote)} />
+            ))}
           </div>
+        </>
+      )}
 
-          {quote && (
-            <div className="mt-5 flex items-center gap-5 rounded-2xl p-4"
-              style={{ background: "var(--bg)", border: "1px solid var(--line)" }}>
-              <Countdown left={left} total={5} />
-              <div className="flex-1">
-                {quote.approved ? (
-                  <>
-                    <div className="text-sm" style={{ color: "var(--fg-soft)" }}>Offered rate</div>
-                    <div className="text-3xl font-extrabold" style={{ color: "var(--accent)" }}>
-                      {pct(quote.interest_rate)} <span className="text-base">APR</span>
-                    </div>
-                    <div className="text-xs" style={{ color: "var(--fg-soft)" }}>
-                      {rlusd(quote.principal)} · {quote.term_hours}h · origination {rlusd(quote.origination_fee)}
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ color: "var(--bad)" }}>Declined: {quote.reason}</div>
-                )}
-              </div>
-              {quote.approved && (
-                <Button onClick={accept} disabled={expired}>
-                  {expired ? "Expired — re-quote" : `Accept (${left.toFixed(1)}s)`}
-                </Button>
-              )}
-            </div>
-          )}
+      {blocked.length > 0 && (
+        <>
+          <h2 className="mt-8 mb-3 text-xl font-bold">Not available right now</h2>
+          <div className="grid gap-5 md:grid-cols-3">
+            {blocked.map((p) => <ThankYouCard key={p.pool_key} p={p} />)}
+          </div>
+        </>
+      )}
+
+      {!data && !loading && (
+        <div className="card mt-6 p-6 text-sm" style={{ color: "var(--fg-soft)" }}>
+          Enter an amount above and we’ll line up every pool you qualify for.
         </div>
       )}
+
       {msg && (
-        <div className="mt-4 text-sm" style={{ color: msg.error ? "var(--bad)" : "var(--accent)" }}>
+        <div className="mt-6 text-sm" style={{ color: msg.error ? "var(--bad)" : "var(--accent)" }}>
           {msg.error || msg.text}
-          <VerifyLink
-            href={msg.explorer_url}
-            hash={msg.tx_hash}
-            label="Verify on XRPL"
-          />
+          <VerifyLink href={msg.explorer_url} hash={msg.tx_hash} label="Verify on XRPL" />
         </div>
       )}
     </Layout>
+  );
+}
+
+function leftFor(quote, now) {
+  if (!quote?.expires_at) return 0;
+  return Math.max(0, quote.expires_at - now);
+}
+
+function QuoteCard({ p, left, onAccept }) {
+  const q = p.quote;
+  const expired = left <= 0;
+  const tone = p.risk_tier === "low" ? "good" : p.risk_tier === "high" ? "bad" : "warn";
+  return (
+    <div className="morph-edge p-4">
+      <div className="flex items-center justify-between">
+        <div className="font-bold">{p.name}</div>
+        <Pill tone={tone}>{p.risk_tier} risk</Pill>
+      </div>
+
+      <div className="mt-3 flex items-center gap-4">
+        <Countdown left={left} total={QUOTE_WINDOW} />
+        <div>
+          <div className="text-xs" style={{ color: "var(--fg-soft)" }}>Offered rate</div>
+          <div className="text-3xl font-extrabold morph-text">{pct(q.interest_rate)}</div>
+          <div className="text-[11px]" style={{ color: "var(--fg-soft)" }}>APR · {q.term_hours}h term</div>
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1">
+        <Row k="Principal" v={rlusd(q.principal)} />
+        <Row k="Term" v={`${q.term_hours} hours`} />
+        <Row k="Total interest" v={rlusd(q.total_interest)} />
+        <Row k="Origination fee" v={rlusd(q.origination_fee)} />
+      </div>
+
+      <Button className="mt-4 w-full justify-center" disabled={expired} onClick={onAccept}>
+        {expired ? "Expired — re-quote" : `Accept · ${left.toFixed(1)}s`}
+      </Button>
+    </div>
+  );
+}
+
+// A polite "thank you" card for pools the borrower can't take right now.
+function ThankYouCard({ p }) {
+  return (
+    <div className="card p-4" style={{ opacity: 0.96 }}>
+      <div className="flex items-center justify-between">
+        <div className="font-bold">{p.name}</div>
+        <Pill tone="muted">not eligible</Pill>
+      </div>
+      <div className="mt-4 flex flex-col items-center text-center">
+        <div className="text-3xl animate-bob">🐟</div>
+        <div className="mt-2 text-sm font-semibold">Thanks for considering this pool</div>
+        <div className="mt-1 text-xs" style={{ color: "var(--fg-soft)" }}>
+          {p.reason || "You’re not eligible for this pool right now."}
+        </div>
+        <div className="mt-3 text-[11px]" style={{ color: "var(--fg-soft)" }}>
+          {p.default_term_hours}h term · from {pct(p.base_apr)} APR
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -149,7 +190,7 @@ function Countdown({ left, total }) {
   const r = 26, c = 2 * Math.PI * r;
   const frac = Math.max(0, left / total);
   return (
-    <svg width="64" height="64" viewBox="0 0 64 64">
+    <svg width="64" height="64" viewBox="0 0 64 64" style={{ flex: "none" }}>
       <circle cx="32" cy="32" r={r} fill="none" stroke="var(--line)" strokeWidth="6" />
       <circle cx="32" cy="32" r={r} fill="none" stroke="var(--accent)" strokeWidth="6"
         strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - frac)}
@@ -160,17 +201,10 @@ function Countdown({ left, total }) {
     </svg>
   );
 }
-function Num({ label, value, onChange }) {
-  return (
-    <label className="flex-1">
-      <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>{label}</span>
-      <input className="input mt-1" type="number" value={value} onChange={(e) => onChange(e.target.value)} />
-    </label>
-  );
-}
+
 function Row({ k, v }) {
   return (
-    <div className="flex items-center justify-between py-1 text-sm">
+    <div className="flex items-center justify-between py-0.5 text-sm">
       <span style={{ color: "var(--fg-soft)" }}>{k}</span>
       <span className="font-bold">{v}</span>
     </div>

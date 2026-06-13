@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
+import { useTx } from "../components/TxProcessing.jsx";
 import { Button, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
 
 export default function LenderDeposit() {
@@ -11,6 +12,7 @@ export default function LenderDeposit() {
   const [sel, setSel] = useState(null);
   const [amount, setAmount] = useState(10000);
   const [msg, setMsg] = useState(null);
+  const { track } = useTx();
 
   const load = () => api.pools().then(setPools);
   useEffect(() => { load(); }, []);
@@ -18,7 +20,14 @@ export default function LenderDeposit() {
   async function deposit() {
     setMsg(null);
     try {
-      const r = await api.deposit({ pool_key: sel, amount: Number(amount) });
+      const r = await track(
+        api.deposit({ pool_key: sel, amount: Number(amount) }),
+        {
+          title: "Depositing into the vault",
+          steps: ["Building VaultDeposit", "Signing", "Submitting to XRPL", "Minting your vault shares"],
+          success: "Deposit confirmed",
+        },
+      );
       setMsg({
         text: `Deposited. Wallet balance ${rlusd(r.wallet_balance)}.`,
         tx_hash: r.tx_hash,

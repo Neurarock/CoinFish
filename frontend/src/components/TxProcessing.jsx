@@ -27,9 +27,14 @@ export function TxProvider({ children }) {
   const track = useCallback(async (promise, opts = {}) => {
     const steps = opts.steps?.length ? opts.steps : DEFAULT_STEPS;
     const stepMs = opts.stepMs || 780;
+    // Inherit whatever role theme is currently mounted so the overlay's accent
+    // colours match the page the user is on (purple / cyan / pink).
+    const themed = typeof document !== "undefined"
+      ? document.querySelector(".theme-lender, .theme-borrower, .theme-vault") : null;
+    const theme = themed ? [...themed.classList].find((c) => c.startsWith("theme-")) || "" : "";
     clearTimers();
     setSt({ title: opts.title || "Submitting to XRPL", steps, idx: 0, status: "running",
-            message: "", explorerUrl: "", successLabel: opts.success || "Confirmed on XRPL Devnet" });
+            theme, message: "", explorerUrl: "", successLabel: opts.success || "Confirmed on XRPL Devnet" });
 
     // Walk the steps, pausing on the final one until the promise settles.
     const iv = setInterval(() => {
@@ -65,9 +70,9 @@ export function TxProvider({ children }) {
 }
 
 function Overlay({ st, onClose }) {
-  const { title, steps, idx, status, message, explorerUrl, successLabel } = st;
+  const { title, steps, idx, status, message, explorerUrl, successLabel, theme } = st;
   return (
-    <div className="tx-scrim" onClick={status !== "running" ? onClose : undefined}>
+    <div className={`tx-scrim ${theme || ""}`} onClick={status !== "running" ? onClose : undefined}>
       <div className="tx-card morph-edge" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-4">
           {status === "running" && <div className="tx-ring" />}

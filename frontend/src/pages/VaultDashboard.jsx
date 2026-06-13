@@ -1,7 +1,6 @@
 // CoinFish's operator dashboard. Shows fee revenue, solvency, risk, pool
 // saturation, and loans inside the grace window with a control to extend grace.
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
@@ -32,20 +31,18 @@ export default function VaultDashboard() {
 
   return (
     <Layout role="admin">
+      <div className="vault-aurora" />
       {d.underwater && <Underwater />}
-      <div className="vault-console relative z-10">
+      <div className="relative z-10">
         <div className="vault-hero flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="vault-kicker">CoinFish command layer</div>
-            <h1 className="text-3xl font-extrabold">Vault operations</h1>
+            <h1 className="text-3xl font-extrabold"><span className="morph-text">Vault operations</span></h1>
             <p className="mt-1 max-w-2xl text-sm" style={{ color: "var(--fg-soft)" }}>
               Devnet treasury control, pool liquidity, protocol fees, and borrower risk signals.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link to="/">
-              <Button variant="ghost">Home</Button>
-            </Link>
             <Pill tone={d.underwater ? "bad" : "good"}>
               {d.underwater ? "underwater" : "solvent"} · {d.solvency_ratio}×
             </Pill>
@@ -163,13 +160,8 @@ function Underwater() {
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-70">
       <div className="absolute inset-x-0 bottom-0 h-2/3"
         style={{
-          background: "linear-gradient(180deg, rgba(0,112,155,0.04), rgba(0,112,155,0.22))",
-          borderTop: "1px solid rgba(2,119,168,0.35)",
-        }} />
-      <div className="absolute inset-0"
-        style={{
-          backgroundImage: "linear-gradient(rgba(2,119,168,0.10) 1px, transparent 1px), linear-gradient(90deg, rgba(2,119,168,0.08) 1px, transparent 1px)",
-          backgroundSize: "42px 42px",
+          background: "linear-gradient(180deg, rgba(219,39,119,0.05), rgba(219,39,119,0.24))",
+          borderTop: "1px solid rgba(236,72,153,0.40)",
         }} />
     </div>
   );

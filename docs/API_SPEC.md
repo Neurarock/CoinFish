@@ -90,6 +90,7 @@ Response fields per pool:
   "risk_tier": "low",
   "base_apr": 0.08,
   "net_apr": 0.0776,
+  "default_term_hours": 24,
   "first_loss_buffer": 0.2,
   "tvl": 500000,
   "available": 320000,
@@ -393,6 +394,74 @@ Response:
 If not approved, the response still returns a quote-shaped object with
 `approved: false` and a human-readable `reason`.
 
+> Note: each pool also carries a `default_term_hours` (Conservative 24h, Balanced
+> 48h, High-Yield 72h) that the UI pre-fills, and `term_hours` is capped at 72h.
+
+### `POST /borrowers/quotes`
+
+Quotes **every pool at once** for a single amount, so the borrower can shop
+around. Each pool uses its own `default_term_hours`. Eligible pools include a
+live quote; ineligible pools include a `reason` and `quote: null`.
+
+Request:
+
+```json
+{ "amount": 40000 }
+```
+
+Response:
+
+```json
+{
+  "amount": 40000,
+  "quotes": [
+    {
+      "pool_key": "low", "name": "CoinFish Conservative", "risk_tier": "low",
+      "base_apr": 0.04, "default_term_hours": 24, "available_liquidity": 320000,
+      "max_borrow": 64000, "eligible": true, "reason": "",
+      "quote": {
+        "id": "5ec9d941df6a", "principal": 40000, "interest_rate": 0.061,
+        "term_hours": 24, "origination_fee": 201, "total_interest": 6.68,
+        "seconds_left": 5, "expires_at": 1781386000.123
+      }
+    },
+    {
+      "pool_key": "high", "name": "CoinFish High-Yield", "risk_tier": "high",
+      "base_apr": 0.14, "default_term_hours": 72, "available_liquidity": 21000,
+      "max_borrow": 0, "eligible": false,
+      "reason": "No borrowing headroom left — repay or add collateral.",
+      "quote": null
+    }
+  ]
+}
+```
+
+### `POST /borrowers/wallet/receive`
+
+Returns the connected wallet's address plus a `xrpl://` QR payload so the borrower
+can **receive RLUSD** (to fund repayments) — the on-chain mirror of the fiat
+top-up QR.
+
+Request:
+
+```json
+{ "amount": 100 }
+```
+
+Response:
+
+```json
+{
+  "xrpl_address": "r...",
+  "currency": "RLUSD",
+  "issuer_address": "r...",
+  "amount": 100,
+  "qr_payload": "xrpl://r...?currency=RLUSD&issuer=r...&amount=100.00",
+  "explorer_url": "https://devnet.xrpl.org/accounts/r...",
+  "rlusd_balance": 250.0
+}
+```
+
 ### `POST /borrowers/loans/accept`
 
 Accepts a live quote, locks collateral, books the loan, and disburses to the
@@ -442,8 +511,12 @@ or:
 { "mode": "full" }
 ```
 
-Full repayment is blocked until half the term has elapsed, so the UI can show the
-minimum-term warning. Interest-only repayment is available immediately.
+Full repayment ("repay all early") is allowed at **any** time. Interest is charged
+up to the **minimum term** (half the agreed term, `config.MIN_TERM_FRACTION`), so
+lenders keep their committed yield even on an early close. The `full` response
+adds `payoff_total`, `interest_charged`, `early`, and `min_term_hours`. The
+borrower dashboard exposes the live payoff for each active loan under
+`loans[].payoff`. Interest-only repayment is available immediately.
 
 Response includes the XRPL Devnet transaction link:
 

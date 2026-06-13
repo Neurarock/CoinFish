@@ -27,12 +27,6 @@ export default function PoolWater({ level = 0.5, height = 150, label, sublabel, 
         {playful && <span className="animate-bob absolute right-3 top-1 text-xl select-none">🐟</span>}
       </div>
 
-      {/* gridlines for a pool-tile feel */}
-      <div className="pointer-events-none absolute inset-0 opacity-20"
-        style={{ backgroundImage:
-          "linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px)",
-          backgroundSize: "26px 26px" }} />
-
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         <div className="text-2xl font-extrabold drop-shadow">{Math.round(pct * 100)}%</div>
         {label && <div className="text-xs font-semibold opacity-80">{label}</div>}

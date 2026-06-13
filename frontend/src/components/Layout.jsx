@@ -6,6 +6,7 @@ import { useAuth } from "../store.jsx";
 import { api } from "../api.js";
 import DevnetBadge from "./DevnetBadge.jsx";
 import Footer from "./Footer.jsx";
+import Logo from "./Logo.jsx";
 
 const THEME = { lender: "theme-lender", borrower: "theme-borrower", admin: "theme-vault" };
 const TITLE = { lender: "CoinFish · Lend", borrower: "CoinFish · Borrow", admin: "CoinFish · Vault" };
@@ -36,10 +37,9 @@ export default function Layout({ role, children }) {
 
   return (
     <div className={`app-bg ${THEME[role] || ""}`}>
-      <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-3"
-        style={{ background: "var(--bg-soft)", borderBottom: "1px solid var(--line)" }}>
-        <div className="flex items-center gap-2 font-extrabold text-lg">
-          {role !== "admin" && <span className="text-2xl">🐟</span>}
+      <header className="relative z-10 flex items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-3 font-extrabold text-lg">
+          <Logo size={56} to="/" />
           {TITLE[role] || "CoinFish"}
         </div>
         <nav className="flex items-center gap-1">

@@ -59,7 +59,7 @@ export default function BorrowerCollateral() {
           {!intent ? (
             <div className="mt-3 flex items-end gap-3">
               <label className="flex-1">
-                <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Amount (GBP)</span>
+                <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Amount (USD)</span>
                 <input className="input mt-1" type="number" value={amount}
                   onChange={(e) => setAmount(e.target.value)} />
               </label>
@@ -90,7 +90,7 @@ export default function BorrowerCollateral() {
           </p>
           <div className="mt-3 flex items-end gap-3">
             <label className="flex-1">
-              <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Amount (GBP)</span>
+              <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Amount (USD)</span>
               <input className="input mt-1" type="number" value={wAmount}
                 onChange={(e) => setWAmount(e.target.value)} />
             </label>

@@ -1,4 +1,4 @@
-# CoinFish 🐟
+# CoinFish
 
 Time-critical, **off-chain-collateralised** lending on the XRP Ledger.
 
@@ -6,6 +6,8 @@ Businesses that are fiat-rich but crypto-poor can borrow stablecoin **instantly*
 on-chain against a fiat deposit held by CoinFish — no on-chain collateral, no slow
 bank settlement. Built on XRPL's native Lending Protocol (XLS-66), Single Asset
 Vaults (XLS-65), Permissioned Domains (XLS-80) and Credentials (XLS-70).
+
+![alt text](/frontend/src/logo.png)
 
 See **[SPEC.md](./SPEC.md)** for the full design, economics, and demo script.
 
@@ -22,7 +24,7 @@ trustline IOU with the currency code `RLUSD` as a stand-in stablecoin.
 ## Layout
 ```
 backend/
-  config.py            network, seeds, fee + pool params, 24h term cap
+  config.py            network, seeds, fee + pool params, 72h term cap
   main.py              FastAPI app
   risk_engine.py       interest-rate / credit logic (off-chain)
   exit_queue.py        fair FIFO withdrawal queue for lender exits
@@ -76,14 +78,20 @@ can open the vault and every transaction on the [Devnet explorer](https://devnet
 > `run_exit_demo.py` and `bootstrap_devnet.py` need internet access.
 
 ## Loan terms & lender exits
-- **Loans are capped at 24h** (`config.MAX_TERM_HOURS`), single fixed-term. This
-  bounds lender lock-up: capital lent out always returns within one loan term.
+- **Loans are capped at 72h** (`config.MAX_TERM_HOURS`), single fixed-term. Each
+  pool pre-fills a **different default term** (Conservative 24h, Balanced 48h,
+  High-Yield 72h) so borrowers have a real reason to shop around — longer
+  commitment is cheaper, shorter is more flexible. This still bounds lender
+  lock-up: capital lent out always returns within one loan term.
+- **Early payoff:** a borrower can repay in full at any time. Interest is charged
+  up to the **minimum term** (half the agreed term, `config.MIN_TERM_FRACTION`),
+  so lenders keep their committed yield even on an early close.
 - **Exit queue** (`exit_queue.py`): a vault `VaultWithdraw` can only draw on
   *idle* liquidity (`AssetsAvailable`); capital out on loan isn't withdrawable
   until repaid. If lenders rush the exit, requests are served first-come-first-
   serve against idle liquidity, **partially filled** where needed, and the rest
   parked in a **fair FIFO queue** that drains as loans repay/mature — so every
-  lender exits within at most one 24h term. The head of the queue always has
+  lender exits within at most one loan term. The head of the queue always has
   priority; no one jumps ahead. See `run_exit_demo.py` for the live bank-run.
 
 ## Lifecycle coverage (all live on Devnet)
@@ -93,11 +101,11 @@ cover draw** (`LoanManage` impair→default, `LoanBroker.CoverAvailable` drawn,
 remainder socialised across vault shares) → lender withdrawal.
 
 ## Pools (MVP)
-| Pool | Risk | First-loss buffer | Base APR |
-|------|------|-------------------|----------|
-| Conservative | low | 20% | 4% |
-| Balanced | medium | 10% | 8% |
-| High-Yield | high | 5% | 14% |
+| Pool | Risk | First-loss buffer | Base APR | Default term |
+|------|------|-------------------|----------|--------------|
+| Conservative | low | 20% | 4% | 24h |
+| Balanced | medium | 10% | 8% | 48h |
+| High-Yield | high | 5% | 14% | 72h |
 
 ## Status
 Backend chain service layer complete and verified **live on Devnet** (M0–M5):

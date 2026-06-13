@@ -19,7 +19,12 @@ export default function LenderDeposit() {
     setMsg(null);
     try {
       const r = await api.deposit({ pool_key: sel, amount: Number(amount) });
-      setMsg({ text: `Deposited. Wallet balance ${rlusd(r.wallet_balance)}.`, tx_hash: r.tx_hash, explorer_url: r.explorer_url });
+      setMsg({
+        text: `Deposited. Wallet balance ${rlusd(r.wallet_balance)}.`,
+        tx_hash: r.tx_hash,
+        explorer_url: r.explorer_url,
+        receipt_url: r.receipt_url,
+      });
       load();
     } catch (e) { setMsg({ error: e.message }); }
   }
@@ -75,7 +80,11 @@ export default function LenderDeposit() {
           {msg && (
             <div className="mt-3 text-sm" style={{ color: msg.error ? "var(--bad)" : "var(--accent)" }}>
               {msg.error || msg.text}
-              <VerifyLink href={msg.explorer_url} hash={msg.tx_hash} />
+              <VerifyLink
+                href={msg.explorer_url || msg.receipt_url}
+                hash={msg.tx_hash}
+                label={msg.explorer_url ? "Verify on XRPL" : "Demo receipt"}
+              />
             </div>
           )}
         </div>

@@ -22,6 +22,10 @@ loan disbursement, and transaction hashes are simulated unless
   deposits, loans, and lender exit rows. Runtime pool balances, quote cache, and
   fee totals are held in memory for the demo.
 - **Quote TTL:** borrower quotes are live for 5 seconds server-side.
+- **Devnet requirement:** wallet, deposit, withdraw, loan origination, repayment,
+  and default actions require XRPL Devnet by default. Set
+  `COINFISH_LIVE_CHAIN=1` with valid setup. The developer-only escape hatch is
+  `COINFISH_REQUIRE_DEVNET_TRANSACTIONS=0`.
 - **Live-chain mode:** with `COINFISH_LIVE_CHAIN=1`, the same endpoint shape calls
   the XRPL service layer for wallet trustlines, vault deposits, loan origination,
   and loan status where implemented.
@@ -42,6 +46,38 @@ Response:
   "pools": ["low", "med", "high"]
 }
 ```
+
+### `GET /runtime/status`
+
+Returns whether the backend is running in local demo mode or XRPL Devnet live
+mode, and whether live mode has all required setup ids/seeds.
+
+Local demo response:
+
+```json
+{
+  "live_chain": false,
+  "mode": "local-demo",
+  "devnet_ready": false,
+  "warnings": []
+}
+```
+
+Live mode without complete setup returns `live_chain: true`,
+`devnet_ready: false`, and concrete warnings such as missing `issuer_address`,
+pool `vault_id`, or pool `loan_broker_id`. The frontend header displays this as
+`Local demo`, `XRPL Devnet`, or warning state.
+
+### `GET /transactions`
+
+Returns persisted XRPL transaction records submitted by frontend-driven API flows.
+Each record includes `action`, `tx_hash`, `explorer_url`, `engine_result`,
+optional `pool_key`, optional `loan_id`, and `amount`.
+
+### `GET /transactions/me`
+
+Authenticated view of the current account's XRPL transaction records. Lender and
+borrower dashboards render this as the transaction ledger.
 
 ### `GET /pools`
 
@@ -149,8 +185,9 @@ Response: `AccountOut`
 
 Connects an XRPL signer. In the demo, the frontend lets the user choose Xaman,
 Crossmark, GemWallet, or a Devnet signer and optionally provide an address. The
-backend records provider, address, account explorer link, and persisted demo RLUSD
-balance. In live-chain mode it creates a faucet wallet and trustline.
+backend records provider, a syntactically valid XRPL classic address, and
+persisted demo RLUSD balance. In live-chain mode it creates a faucet wallet and
+trustline, and returns an XRPL Explorer account link.
 
 Request:
 
@@ -167,9 +204,12 @@ Response:
   "xrpl_address": "r...",
   "provider": "crossmark",
   "rlusd_balance": 500000,
-  "explorer_url": "https://devnet.xrpl.org/accounts/r..."
+  "explorer_url": ""
 }
 ```
+
+`explorer_url` is empty in local demo mode. It is populated only when the account
+really exists on XRPL Devnet.
 
 ## Lender endpoints
 
@@ -189,11 +229,16 @@ Response:
 {
   "ok": true,
   "tx_hash": "DEMO_HASH",
-  "explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH",
+  "explorer_url": "",
+  "receipt_url": "/api/receipts/DEMO_HASH",
   "wallet_balance": 475000,
   "pool": { "key": "med", "tvl": 345000, "drawn": 210000 }
 }
 ```
+
+In local demo mode, `tx_hash` is a synthetic receipt id and `receipt_url` is
+populated. In live-chain mode, `explorer_url` is populated with the XRPL Explorer
+transaction link and `receipt_url` is empty.
 
 Errors:
 
@@ -224,7 +269,8 @@ Response:
   "queued": true,
   "message": "Pool liquidity is low...",
   "tx_hashes": ["DEMO_HASH"],
-  "explorer_urls": ["https://devnet.xrpl.org/transactions/DEMO_HASH"],
+  "explorer_urls": [""],
+  "receipt_urls": ["/api/receipts/DEMO_HASH"],
   "wallet_balance": 480000
 }
 ```
@@ -370,7 +416,8 @@ Response:
   "ok": true,
   "loan_id": 1,
   "tx_hash": "DEMO_HASH",
-  "explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH",
+  "explorer_url": "",
+  "receipt_url": "/api/receipts/DEMO_HASH",
   "wallet_balance": 40000,
   "disbursed_to": "r...",
   "principal": 40000
@@ -402,7 +449,7 @@ or:
 Full repayment is blocked until half the term has elapsed, so the UI can show the
 minimum-term warning. Interest-only repayment is available immediately.
 
-Response includes a transaction hash and explorer URL for the payment action:
+Response includes either a live XRPL explorer URL or a local demo receipt URL:
 
 ```json
 {
@@ -411,7 +458,8 @@ Response includes a transaction hash and explorer URL for the payment action:
   "interest_paid": 9.04,
   "outstanding": 40000,
   "tx_hash": "DEMO_HASH",
-  "explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH",
+  "explorer_url": "",
+  "receipt_url": "/api/receipts/DEMO_HASH",
   "wallet_balance": 39990.96
 }
 ```
@@ -430,7 +478,8 @@ Response:
   "default_charge": 2050,
   "collateral_seized": 42050,
   "tx_hash": "DEMO_HASH",
-  "explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH"
+  "explorer_url": "",
+  "receipt_url": "/api/receipts/DEMO_HASH"
 }
 ```
 
@@ -462,7 +511,8 @@ Response:
       "pool_key": "low",
       "principal": 40000,
       "status": "active",
-      "origination_explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH",
+      "origination_explorer_url": "",
+      "origination_receipt_url": "/api/receipts/DEMO_HASH",
       "due_at": "2026-06-14T12:00:00"
     }
   ],
@@ -532,6 +582,22 @@ Response:
 Returns read-only loan status for borrower or operator support flows. In
 live-chain mode and when the loan has an XRPL id, it also includes `on_chain`
 status from the XRPL service layer.
+
+## Demo receipts
+
+### `GET /receipts/{receipt_id}`
+
+Returns an honest receipt for local demo actions. These are not XRPL
+transactions.
+
+```json
+{
+  "receipt_id": "DEMO_HASH",
+  "mode": "local-demo",
+  "on_chain": false,
+  "message": "This is a local CoinFish demo receipt. No XRPL transaction was submitted."
+}
+```
 
 ## Backend additions still worth considering
 

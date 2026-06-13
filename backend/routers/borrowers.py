@@ -32,6 +32,9 @@ from ..services import (
     collateral_balance,
     collateral_locked,
     explorer_tx,
+    receipt_url,
+    record_onchain_tx,
+    require_devnet_transactions,
     require_role,
     session_dep,
 )
@@ -152,6 +155,7 @@ def request_quote(body: QuoteIn, acct: Account = Depends(borrower_only),
 @router.post("/loans/accept")
 def accept_quote(body: AcceptQuoteIn, acct: Account = Depends(borrower_only),
                  session: Session = Depends(session_dep)) -> dict:
+    require_devnet_transactions("Loan origination")
     q = rt.quotes.get(body.quote_id)
     if not q or q.account_id != acct.id:
         raise HTTPException(404, "quote not found")
@@ -166,12 +170,21 @@ def accept_quote(body: AcceptQuoteIn, acct: Account = Depends(borrower_only),
     tx_hash = rt.fake_tx_hash()
     loan_id = ""
     if LIVE_CHAIN:
+        try:
+            rt.require_live_ready(pool_key=pool.key, need_broker=True)
+        except RuntimeError as exc:
+            raise HTTPException(503, f"Devnet live mode is not configured: {exc}") from exc
+        from ..xrpl_service import assets
         from ..xrpl_service import loan as loan_svc
         from ..xrpl_service.client import get_client, wallet_from_seed
+        client = get_client()
         res = loan_svc.originate_loan(
             wallet_from_seed(rt.operator_seed), wallet_from_seed(acct.xrpl_seed),
-            pool.loan_broker_id, q.principal, q.interest_rate, q.term_hours, get_client())
+            pool.loan_broker_id, q.principal, q.interest_rate, q.term_hours, client)
+        if not res.ok:
+            raise HTTPException(502, f"LoanSet failed on Devnet: {res.engine_result}")
         tx_hash, loan_id = res.hash, (loan_svc.loan_id_from_result(res) or "")
+        acct.wallet_rlusd_balance = assets.rlusd_balance(acct.xrpl_address, rt.issuer_address, client)
 
     # lock collateral, draw pool liquidity, book the loan + fee
     session.add(FiatLedger(account_id=acct.id, entry_type="lock",
@@ -188,15 +201,29 @@ def accept_quote(body: AcceptQuoteIn, acct: Account = Depends(borrower_only),
     session.add(loan)
     session.commit()
     session.refresh(loan)
+    if LIVE_CHAIN:
+        record_onchain_tx(
+            session,
+            account_id=acct.id,
+            action="loan_origination",
+            tx_hash=tx_hash,
+            engine_result=res.engine_result,
+            pool_key=q.pool_key,
+            loan_id=loan.id,
+            amount=q.principal,
+        )
+        session.commit()
     del rt.quotes[q.id]
     return {"ok": True, "loan_id": loan.id, "tx_hash": tx_hash,
-            "explorer_url": explorer_tx(tx_hash), "wallet_balance": acct.wallet_rlusd_balance,
+            "explorer_url": explorer_tx(tx_hash), "receipt_url": receipt_url(tx_hash),
+            "wallet_balance": acct.wallet_rlusd_balance,
             "disbursed_to": acct.xrpl_address, "principal": q.principal}
 
 
 @router.post("/loans/{loan_id}/repay")
 def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
           session: Session = Depends(session_dep)) -> dict:
+    require_devnet_transactions("Loan repayment")
     loan = session.get(Loan, loan_id)
     if not loan or loan.account_id != acct.id:
         raise HTTPException(404, "loan not found")
@@ -208,6 +235,34 @@ def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
         if not LIVE_CHAIN and interest_due > (acct.wallet_rlusd_balance or 0.0) + 1e-6:
             raise HTTPException(400, f"wallet balance is only {acct.wallet_rlusd_balance:.2f} RLUSD")
         tx_hash = rt.fake_tx_hash()
+        if LIVE_CHAIN:
+            if not loan.xrpl_loan_id:
+                raise HTTPException(400, "loan has no XRPL loan id; cannot repay on-chain")
+            from ..xrpl_service import assets
+            from ..xrpl_service import loan as loan_svc
+            from ..xrpl_service.client import get_client, wallet_from_seed
+            client = get_client()
+            res = loan_svc.repay(
+                wallet_from_seed(acct.xrpl_seed),
+                loan.xrpl_loan_id,
+                rt.issuer_address,
+                interest_due,
+                client,
+            )
+            if not res.ok:
+                raise HTTPException(502, f"LoanPay failed on Devnet: {res.engine_result}")
+            tx_hash = res.hash
+            record_onchain_tx(
+                session,
+                account_id=acct.id,
+                action="loan_pay_interest",
+                tx_hash=tx_hash,
+                engine_result=res.engine_result,
+                pool_key=loan.pool_key,
+                loan_id=loan.id,
+                amount=interest_due,
+            )
+            acct.wallet_rlusd_balance = assets.rlusd_balance(acct.xrpl_address, rt.issuer_address, client)
         loan.interest_paid += interest_due
         rt.fees_collected += round(interest_due * config.MANAGEMENT_FEE, 2)
         if not LIVE_CHAIN:
@@ -217,6 +272,7 @@ def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
         return {"ok": True, "mode": "interest", "interest_paid": interest_due,
                 "outstanding": loan.principal, "tx_hash": tx_hash,
                 "explorer_url": explorer_tx(tx_hash),
+                "receipt_url": receipt_url(tx_hash),
                 "wallet_balance": acct.wallet_rlusd_balance}
 
     if body.mode == "full":
@@ -232,6 +288,33 @@ def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
         if not LIVE_CHAIN and repay_total > (acct.wallet_rlusd_balance or 0.0) + 1e-6:
             raise HTTPException(400, f"wallet balance is only {acct.wallet_rlusd_balance:.2f} RLUSD")
         tx_hash = rt.fake_tx_hash()
+        if LIVE_CHAIN:
+            if not loan.xrpl_loan_id:
+                raise HTTPException(400, "loan has no XRPL loan id; cannot repay on-chain")
+            from ..xrpl_service import assets
+            from ..xrpl_service import loan as loan_svc
+            from ..xrpl_service.client import get_client, wallet_from_seed
+            client = get_client()
+            res = loan_svc.repay_full(
+                wallet_from_seed(acct.xrpl_seed),
+                loan.xrpl_loan_id,
+                rt.issuer_address,
+                client,
+            )
+            if not res.ok:
+                raise HTTPException(502, f"LoanPay full failed on Devnet: {res.engine_result}")
+            tx_hash = res.hash
+            record_onchain_tx(
+                session,
+                account_id=acct.id,
+                action="loan_pay_full",
+                tx_hash=tx_hash,
+                engine_result=res.engine_result,
+                pool_key=loan.pool_key,
+                loan_id=loan.id,
+                amount=repay_total,
+            )
+            acct.wallet_rlusd_balance = assets.rlusd_balance(acct.xrpl_address, rt.issuer_address, client)
         loan.interest_paid += interest_due
         loan.status = LoanStatus.REPAID
         rt.pools[loan.pool_key].drawn = max(0.0, rt.pools[loan.pool_key].drawn - loan.principal)
@@ -246,6 +329,7 @@ def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
         return {"ok": True, "mode": "full", "interest_paid": loan.interest_paid,
                 "principal_repaid": loan.principal, "status": "repaid",
                 "tx_hash": tx_hash, "explorer_url": explorer_tx(tx_hash),
+                "receipt_url": receipt_url(tx_hash),
                 "wallet_balance": acct.wallet_rlusd_balance}
 
     raise HTTPException(400, "mode must be 'interest' or 'full'")
@@ -255,6 +339,7 @@ def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
 def default_loan(loan_id: int, acct: Account = Depends(borrower_only),
                  session: Session = Depends(session_dep)) -> dict:
     """Borrower defaults: forfeit collateral + a default charge, clearly billed."""
+    require_devnet_transactions("Loan default")
     loan = session.get(Loan, loan_id)
     if not loan or loan.account_id != acct.id:
         raise HTTPException(404, "loan not found")
@@ -262,6 +347,30 @@ def default_loan(loan_id: int, acct: Account = Depends(borrower_only),
         raise HTTPException(400, f"loan is {loan.status.value}")
     default_charge = round(loan.principal * 0.05 + config.FIXED_SERVICE_FEE, 2)
     tx_hash = rt.fake_tx_hash()
+    if LIVE_CHAIN:
+        if not loan.xrpl_loan_id:
+            raise HTTPException(400, "loan has no XRPL loan id; cannot default on-chain")
+        from ..xrpl_service import loan as loan_svc
+        from ..xrpl_service.client import get_client, wallet_from_seed
+        client = get_client()
+        res = loan_svc.default_loan(wallet_from_seed(rt.operator_seed), loan.xrpl_loan_id, client)
+        if not res.ok:
+            raise HTTPException(
+                409,
+                "XRPL did not accept default yet. The loan generally must be past "
+                f"due/grace before LoanManage default is valid: {res.engine_result}",
+            )
+        tx_hash = res.hash
+        record_onchain_tx(
+            session,
+            account_id=acct.id,
+            action="loan_default",
+            tx_hash=tx_hash,
+            engine_result=res.engine_result,
+            pool_key=loan.pool_key,
+            loan_id=loan.id,
+            amount=loan.principal,
+        )
     loan.default_charge = default_charge
     loan.status = LoanStatus.DEFAULTED
     rt.pools[loan.pool_key].drawn = max(0.0, rt.pools[loan.pool_key].drawn - loan.principal)
@@ -274,7 +383,8 @@ def default_loan(loan_id: int, acct: Account = Depends(borrower_only),
     session.commit()
     return {"ok": True, "status": "defaulted", "default_charge": default_charge,
             "collateral_seized": round(loan.principal + default_charge, 2),
-            "tx_hash": tx_hash, "explorer_url": explorer_tx(tx_hash)}
+            "tx_hash": tx_hash, "explorer_url": explorer_tx(tx_hash),
+            "receipt_url": receipt_url(tx_hash)}
 
 
 # --- dashboard ---------------------------------------------------------------
@@ -296,6 +406,7 @@ def dashboard(acct: Account = Depends(borrower_only),
         "default_charge": l.default_charge,
         "origination_tx": l.origination_tx,
         "origination_explorer_url": explorer_tx(l.origination_tx),
+        "origination_receipt_url": receipt_url(l.origination_tx),
         "due_at": l.due_at.isoformat() if l.due_at else None,
     } for l in loans]
     bill = {

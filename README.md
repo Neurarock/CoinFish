@@ -58,6 +58,15 @@ python -m backend.scripts.bootstrap_devnet
 uvicorn backend.main:app --reload
 ```
 
+For the React/FastAPI local app and Vercel deployment workflow, see
+**[docs/LOCAL_AND_VERCEL.md](./docs/LOCAL_AND_VERCEL.md)**. The short version:
+
+```bash
+cd frontend && npm install && cd ..
+npm run dev:devnet   # frontend :5173 + API :8000, real XRPL Devnet submits
+npm run test:local   # backend tests + frontend build + API smoke test
+```
+
 Each live step prints a `tesSUCCESS` hash + explorer link, and `run_demo` prints
 the `vault_id` / `broker_id` / `domain_id` plus the operator account link so you
 can open the vault and every transaction on the [Devnet explorer](https://devnet.xrpl.org).

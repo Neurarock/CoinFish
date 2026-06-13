@@ -5,20 +5,32 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
+import TxLedger from "../components/TxLedger.jsx";
 import { Button, Stat, Pill, VerifyLink, rlusd, gbp, pct } from "../components/ui.jsx";
 
 export default function BorrowerDashboard() {
   const [d, setD] = useState(null);
   const [msg, setMsg] = useState(null);
+  const [txs, setTxs] = useState([]);
 
-  const load = () => api.borrowerDashboard().then(setD);
+  const load = () => {
+    api.borrowerDashboard().then(setD);
+    api.myTransactions().then(setTxs).catch(() => setTxs([]));
+  };
   useEffect(() => { load(); }, []);
 
   async function act(fn, loanId) {
     setMsg(null);
     try {
       const r = await fn();
-      setMsg({ loanId, text: summarise(r), tone: "good", tx_hash: r.tx_hash, explorer_url: r.explorer_url });
+      setMsg({
+        loanId,
+        text: summarise(r),
+        tone: "good",
+        tx_hash: r.tx_hash,
+        explorer_url: r.explorer_url,
+        receipt_url: r.receipt_url,
+      });
       load();
     } catch (e) { setMsg({ loanId, text: e.message, tone: "bad" }); }
   }
@@ -63,7 +75,11 @@ export default function BorrowerDashboard() {
               pool {l.pool_key} · interest paid {rlusd(l.interest_paid)}
               {l.default_charge > 0 && <> · default charge {rlusd(l.default_charge)}</>}
             </div>
-            <VerifyLink href={l.origination_explorer_url} hash={l.origination_tx} label="Verify origination on XRPL" />
+            <VerifyLink
+              href={l.origination_explorer_url || l.origination_receipt_url}
+              hash={l.origination_tx}
+              label={l.origination_explorer_url ? "Verify origination on XRPL" : "Origination demo receipt"}
+            />
             {l.status === "active" && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button variant="ghost" onClick={() => act(() => api.repay(l.id, { mode: "interest" }), l.id)}>
@@ -82,12 +98,17 @@ export default function BorrowerDashboard() {
             {msg?.loanId === l.id && (
               <div className="mt-2 text-sm" style={{ color: `var(--${msg.tone})` }}>
                 {msg.text}
-                <VerifyLink href={msg.explorer_url} hash={msg.tx_hash} />
+                <VerifyLink
+                  href={msg.explorer_url || msg.receipt_url}
+                  hash={msg.tx_hash}
+                  label={msg.explorer_url ? "Verify on XRPL" : "Demo receipt"}
+                />
               </div>
             )}
           </div>
         ))}
       </div>
+      <TxLedger rows={txs} />
     </Layout>
   );
 }

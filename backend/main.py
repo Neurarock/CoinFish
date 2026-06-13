@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, db
-from .routers import admin, auth, borrowers, lenders, loans, pools
+from .routers import admin, auth, borrowers, lenders, loans, pools, receipts, runtime_status, transactions
 
 app = FastAPI(title="CoinFish", version="0.2.0")
 
@@ -50,3 +50,6 @@ app.include_router(lenders.router)
 app.include_router(borrowers.router)
 app.include_router(loans.router)
 app.include_router(admin.router)
+app.include_router(receipts.router)
+app.include_router(runtime_status.router)
+app.include_router(transactions.router)

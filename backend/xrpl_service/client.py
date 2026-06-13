@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from xrpl.clients import JsonRpcClient
+from xrpl.asyncio.transaction.reliable_submission import XRPLReliableSubmissionException
 from xrpl.transaction import submit_and_wait
 from xrpl.wallet import Wallet, generate_faucet_wallet
 
@@ -42,7 +43,10 @@ def submit(tx, *wallets: Wallet, client: JsonRpcClient | None = None) -> TxResul
     """
     client = client or get_client()
     submitter = wallets[0]
-    response = submit_and_wait(tx, client, submitter)
+    try:
+        response = submit_and_wait(tx, client, submitter)
+    except XRPLReliableSubmissionException as exc:
+        return TxResult(ok=False, hash="", engine_result=str(exc), raw={"error": str(exc)})
     result = response.result
     meta = result.get("meta", {})
     engine = meta.get("TransactionResult", "") if isinstance(meta, dict) else ""
@@ -59,7 +63,10 @@ def submit_signed(tx, *, client: JsonRpcClient | None = None) -> TxResult:
     client = client or get_client()
     # no wallet + no autofill/check_fee: the tx already carries both signatures,
     # so we must not mutate it (that would invalidate the co-signature).
-    response = submit_and_wait(tx, client, autofill=False, check_fee=False)
+    try:
+        response = submit_and_wait(tx, client, autofill=False, check_fee=False)
+    except XRPLReliableSubmissionException as exc:
+        return TxResult(ok=False, hash="", engine_result=str(exc), raw={"error": str(exc)})
     result = response.result
     meta = result.get("meta", {})
     engine = meta.get("TransactionResult", "") if isinstance(meta, dict) else ""

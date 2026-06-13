@@ -4,13 +4,18 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
+import TxLedger from "../components/TxLedger.jsx";
 import { Button, Stat, Pill, rlusd, pct } from "../components/ui.jsx";
 
 export default function VaultDashboard() {
   const [d, setD] = useState(null);
   const [hours, setHours] = useState({});
+  const [txs, setTxs] = useState([]);
 
-  const load = () => api.adminDashboard().then(setD);
+  const load = () => {
+    api.adminDashboard().then(setD);
+    api.allTransactions().then(setTxs).catch(() => setTxs([]));
+  };
   useEffect(() => {
     load();
     const t = setInterval(load, 5000);
@@ -122,6 +127,7 @@ export default function VaultDashboard() {
             ))}
           </div>
         )}
+        <TxLedger rows={txs} title="XRPL transaction ledger" />
       </div>
     </Layout>
   );

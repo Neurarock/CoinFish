@@ -28,6 +28,7 @@ from . import config
 from .exit_queue import ExitQueue
 
 LIVE_CHAIN = os.getenv("COINFISH_LIVE_CHAIN", "0") == "1"
+REQUIRE_DEVNET_TRANSACTIONS = os.getenv("COINFISH_REQUIRE_DEVNET_TRANSACTIONS", "1") == "1"
 SETUP_PATH = Path(os.getenv("COINFISH_SETUP_JSON", "setup.json"))
 
 
@@ -98,8 +99,9 @@ class Runtime:
     # -- setup ------------------------------------------------------------
     def _load_setup(self) -> None:
         if not SETUP_PATH.exists():
-            return
-        data = json.loads(SETUP_PATH.read_text())
+            data = {}
+        else:
+            data = json.loads(SETUP_PATH.read_text())
         self.domain_id = data.get("domain_id", self.domain_id)
         self.operator_seed = data.get("operator_seed", self.operator_seed)
         self.issuer_seed = data.get("issuer_seed", self.issuer_seed)
@@ -109,6 +111,13 @@ class Runtime:
             if pr:
                 pr.vault_id = p.get("vault_id", "")
                 pr.loan_broker_id = p.get("loan_broker_id", "")
+        for key, pr in self.pools.items():
+            env_key = key.upper().replace("-", "_")
+            pr.vault_id = os.getenv(f"COINFISH_POOL_{env_key}_VAULT_ID", pr.vault_id)
+            pr.loan_broker_id = os.getenv(
+                f"COINFISH_POOL_{env_key}_LOAN_BROKER_ID",
+                pr.loan_broker_id,
+            )
 
     def _seed_demo_liquidity(self) -> None:
         """Give each pool plausible starting numbers so the UI looks alive."""
@@ -132,6 +141,58 @@ class Runtime:
 
     def fake_tx_hash(self) -> str:
         return uuid.uuid4().hex.upper() + uuid.uuid4().hex.upper()[:32]
+
+    def live_warnings(self) -> list[str]:
+        warnings: list[str] = []
+        if not LIVE_CHAIN:
+            return warnings
+        if not self.issuer_address:
+            warnings.append("COINFISH_ISSUER_ADDRESS or setup.json issuer_address is missing")
+        if not self.issuer_seed:
+            warnings.append("COINFISH_ISSUER_SEED or setup.json issuer_seed is missing")
+        if not self.operator_seed:
+            warnings.append("COINFISH_OPERATOR_SEED or setup.json operator_seed is missing")
+        for key, pool in self.pools.items():
+            if not pool.vault_id:
+                warnings.append(f"pool {key} vault_id is missing")
+            if not pool.loan_broker_id:
+                warnings.append(f"pool {key} loan_broker_id is missing")
+        return warnings
+
+    def require_live_ready(self, *, pool_key: str | None = None, need_broker: bool = False) -> None:
+        warnings = self.live_warnings()
+        if pool_key:
+            pool = self.pool(pool_key)
+            if not pool:
+                warnings.append(f"unknown pool {pool_key}")
+            else:
+                if not pool.vault_id:
+                    warnings.append(f"pool {pool_key} vault_id is missing")
+                if need_broker and not pool.loan_broker_id:
+                    warnings.append(f"pool {pool_key} loan_broker_id is missing")
+        if warnings:
+            raise RuntimeError("; ".join(warnings))
+
+    def status(self) -> dict:
+        warnings = self.live_warnings()
+        return {
+            "live_chain": LIVE_CHAIN,
+            "requires_devnet_transactions": REQUIRE_DEVNET_TRANSACTIONS,
+            "mode": "xrpl-devnet-live" if LIVE_CHAIN else "local-demo",
+            "devnet_ready": LIVE_CHAIN and not warnings,
+            "warnings": warnings,
+            "issuer_address": self.issuer_address if LIVE_CHAIN else "",
+            "domain_id": self.domain_id if LIVE_CHAIN else "",
+            "pools": [
+                {
+                    "key": key,
+                    "vault_id": pool.vault_id if LIVE_CHAIN else "",
+                    "loan_broker_id": pool.loan_broker_id if LIVE_CHAIN else "",
+                    "ready": bool(pool.vault_id and pool.loan_broker_id),
+                }
+                for key, pool in self.pools.items()
+            ],
+        }
 
 
 # module-level singleton used by the routers

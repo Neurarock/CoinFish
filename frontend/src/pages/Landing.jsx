@@ -195,7 +195,13 @@ function WalletConnect({ wallet, choice, setChoice, address, setAddress, onConne
           </div>
           <Pill tone="good">{rlusd(wallet.rlusd_balance)}</Pill>
         </div>
-        <VerifyLink href={wallet.explorer_url} label="View account on XRPL" />
+        {wallet.explorer_url ? (
+          <VerifyLink href={wallet.explorer_url} label="View account on XRPL" />
+        ) : (
+          <div className="mt-2 text-xs" style={{ color: "var(--fg-soft)" }}>
+            Local demo signer. No XRPL account was funded in demo mode.
+          </div>
+        )}
       </div>
     );
   }

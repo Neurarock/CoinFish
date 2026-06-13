@@ -81,8 +81,8 @@ After the account is created the card reveals the onboarding steps:
    the rate engine.
 3. **Connect XRPL signer** — choose Xaman, Crossmark, GemWallet, or a Devnet
    demo signer. The proof of concept records the chosen provider, XRPL address,
-   account explorer link, and demo RLUSD balance in SQLite so refresh/login keeps
-   the same wallet state.
+   demo RLUSD balance in SQLite so refresh/login keeps the same wallet state.
+   In live-chain mode the connected account also gets an XRPL Explorer link.
 
 When KYC (+ credit for borrowers) is green and a wallet is connected, the **Enter
 app** button activates and routes into the right world. **Login** is a simple
@@ -94,8 +94,8 @@ variable yield, exit-queue behaviour, first-loss ≠ no-loss, Devnet demo). Then
 **three pools** as cards, each disclosing: net & base APR, first-loss buffer %,
 first-loss capital, idle/available liquidity, and a `PoolWater` tank showing how
 saturated it is. Selecting a pool opens a deposit panel. On success it shows a
-highlighted **Verify on XRPL** link, updates the persisted wallet balance, and
-refreshes pool numbers.
+highlighted **Verify on XRPL** link in live-chain mode, or a **Demo receipt** in
+local demo mode, updates the persisted wallet balance, and refreshes pool numbers.
 
 ### 3.3 Lender · Dashboard (`pages/LenderDashboard.jsx`)
 Top stats: total deposited, vault shares, accrued yield (estimate). Then a card per
@@ -122,8 +122,8 @@ collateral and current LTV, showing from-APR, max borrow, current LTV, pool
 liquidity. Pick an eligible pool, enter amount + term (≤24h), **Request quote**.
 The quote is **live for 5 seconds**: a circular countdown ring runs down; **Accept**
 within the window disburses RLUSD to the connected wallet (shows the highlighted
-XRPL explorer verification link, then routes to the dashboard). After 0s the
-button flips to "Expired — re-quote".
+XRPL explorer verification link in live-chain mode, or a demo receipt locally,
+then routes to the dashboard). After 0s the button flips to "Expired — re-quote".
 
 ### 3.6 Borrower · Dashboard (`pages/BorrowerDashboard.jsx`)
 Stats: total borrowed, outstanding, interest paid, available collateral. An itemised
@@ -194,8 +194,9 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
 The Vite dev server proxies `/api` → `:8000` (see `vite.config.js`). The backend
-runs in off-chain demo mode by default so the whole journey is clickable with no
-network; set `COINFISH_LIVE_CHAIN=1` to route deposits/loans/repays through Devnet.
+runs with Devnet transactions required for wallet/deposit/borrow/repay/default
+actions. Use `npm run dev:devnet` after `bootstrap_devnet.py` so the frontend
+shows real XRPL Explorer links.
 
 ---
 

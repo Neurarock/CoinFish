@@ -55,6 +55,7 @@ provides `LIVE_CHAIN`, controlled by `COINFISH_LIVE_CHAIN=1`.
 
 In demo mode, pool TVL/drawn/first-loss values are seeded so the dashboards look
 alive immediately. In live-chain mode, selected actions call `backend/xrpl_service`.
+Frontend-driven XRPL transaction hashes are persisted in `OnChainTx`.
 
 ### `backend/services.py`
 
@@ -64,7 +65,7 @@ Shared backend helpers:
 - FastAPI dependencies for current account, session, and role gating;
 - account serialization;
 - collateral balance math;
-- wallet balance and XRPL explorer URL helpers.
+- wallet balance, demo receipt, and XRPL explorer URL helpers.
 
 The collateral helpers deliberately treat `lock` and `release` rows as
 informational ring-fencing, not custody movements. This avoids double-counting
@@ -175,7 +176,8 @@ enter the role journey.
 The lender's first post-login screen. It shows professional risk warnings, the
 three pool cards, wallet status, and a deposit form. Successful deposits refresh
 pool data, update persisted wallet balance, and show the returned transaction hash
-with an XRPL explorer verification link.
+with either an XRPL explorer verification link in live-chain mode or a demo receipt
+in local mode.
 
 ### `frontend/src/pages/LenderDashboard.jsx`
 
@@ -214,7 +216,9 @@ with grace-extension controls.
 `backend/routers/__init__.py` marks the router directory as a package.
 `backend/routers/pools.py` provides shared pool read endpoints.
 `backend/routers/loans.py` provides a read-only loan status lookup used by support
-or future detail pages.
+or future detail pages. `backend/routers/transactions.py` exposes the persisted
+XRPL transaction ledger. `backend/routers/receipts.py` remains only for
+developer-demo tests where Devnet transaction enforcement is explicitly disabled.
 
 ### Existing backend engines used by the UX layer
 
@@ -230,7 +234,8 @@ or future detail pages.
 `frontend/src/components/QrCode.jsx` renders a deterministic QR-like code for the
 bank transfer payload without adding a dependency.
 `frontend/src/components/ui.jsx` contains small shared UI atoms, formatting
-helpers, and the highlighted `VerifyLink` used for XRPL explorer verification.
+helpers, and the highlighted `VerifyLink` used for XRPL explorer verification or
+local demo receipts.
 
 ### Frontend project configuration
 

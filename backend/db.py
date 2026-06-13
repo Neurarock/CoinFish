@@ -134,6 +134,21 @@ class ExitRow(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class OnChainTx(SQLModel, table=True):
+    """Every XRPL transaction submitted by the frontend-driven API."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    account_id: Optional[int] = Field(default=None, index=True, foreign_key="account.id")
+    action: str = Field(index=True)
+    tx_hash: str = Field(index=True)
+    explorer_url: str
+    engine_result: str = ""
+    pool_key: str = ""
+    loan_id: Optional[int] = Field(default=None, index=True)
+    amount: float = 0.0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     _ensure_account_columns()

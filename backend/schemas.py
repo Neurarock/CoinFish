@@ -47,6 +47,7 @@ class WalletOut(BaseModel):
     provider: str
     rlusd_balance: float
     explorer_url: str
+    transactions: list[dict] = []
 
 
 class WalletConnectIn(BaseModel):
@@ -164,3 +165,16 @@ class AdminDashboardOut(BaseModel):
     risk_band: str
     pools: list[dict]
     at_risk_loans: list[dict]      # loans inside the grace window (critical section)
+
+
+class OnChainTxOut(BaseModel):
+    id: int
+    account_id: Optional[int]
+    action: str
+    tx_hash: str
+    explorer_url: str
+    engine_result: str
+    pool_key: str
+    loan_id: Optional[int]
+    amount: float
+    created_at: str

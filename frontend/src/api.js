@@ -36,6 +36,9 @@ export const api = {
 
   // pools
   pools: () => req("GET", "/pools"),
+  runtimeStatus: () => req("GET", "/runtime/status"),
+  myTransactions: () => req("GET", "/transactions/me"),
+  allTransactions: () => req("GET", "/transactions"),
 
   // lender
   deposit: (b) => req("POST", "/lenders/deposit", b),

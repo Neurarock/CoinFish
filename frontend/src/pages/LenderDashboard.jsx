@@ -5,14 +5,19 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
+import TxLedger from "../components/TxLedger.jsx";
 import { Button, Stat, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
 
 export default function LenderDashboard() {
   const [d, setD] = useState(null);
   const [wd, setWd] = useState({});
   const [msg, setMsg] = useState(null);
+  const [txs, setTxs] = useState([]);
 
-  const load = () => api.lenderDashboard().then(setD);
+  const load = () => {
+    api.lenderDashboard().then(setD);
+    api.myTransactions().then(setTxs).catch(() => setTxs([]));
+  };
   useEffect(() => { load(); }, []);
 
   async function withdraw(pool_key) {
@@ -85,6 +90,7 @@ export default function LenderDashboard() {
           </div>
         </>
       )}
+      <TxLedger rows={txs} />
     </Layout>
   );
 }
@@ -95,9 +101,17 @@ function WithdrawMsg({ msg }) {
   return (
     <div className="mt-2 text-sm" style={{ color: tone }}>
       <div>{msg.message} Wallet balance {rlusd(msg.wallet_balance)}.</div>
-      {(msg.explorer_urls || []).map((url, i) => (
-        <VerifyLink key={url} href={url} hash={msg.tx_hashes?.[i]} />
-      ))}
+      {(msg.tx_hashes || []).map((hash, i) => {
+        const href = msg.explorer_urls?.[i] || msg.receipt_urls?.[i];
+        return (
+          <VerifyLink
+            key={hash}
+            href={href}
+            hash={hash}
+            label={msg.explorer_urls?.[i] ? "Verify on XRPL" : "Demo receipt"}
+          />
+        );
+      })}
     </div>
   );
 }

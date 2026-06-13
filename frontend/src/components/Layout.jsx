@@ -1,7 +1,10 @@
 // Applies the role palette (theme-lender / theme-borrower / theme-vault) and
 // renders the top nav. Wrap every authenticated page in this.
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "../store.jsx";
+import { api } from "../api.js";
+import { Pill } from "./ui.jsx";
 
 const THEME = { lender: "theme-lender", borrower: "theme-borrower", admin: "theme-vault" };
 const TITLE = { lender: "CoinFish · Lend", borrower: "CoinFish · Borrow", admin: "CoinFish · Vault" };
@@ -24,6 +27,11 @@ export default function Layout({ role, children }) {
   const loc = useLocation();
   const nav = useNavigate();
   const links = NAV[role] || [];
+  const [status, setStatus] = useState(null);
+
+  useEffect(() => {
+    api.runtimeStatus().then(setStatus).catch(() => setStatus(null));
+  }, []);
 
   return (
     <div className={`app-bg ${THEME[role] || ""}`}>
@@ -50,6 +58,13 @@ export default function Layout({ role, children }) {
               style={{ color: "var(--fg-soft)" }}>
               Sign out
             </button>
+          )}
+          {status && (
+            <span className="ml-2 hidden sm:inline-flex" title={status.warnings?.join("\n") || status.mode}>
+              <Pill tone={status.live_chain ? (status.devnet_ready ? "good" : "warn") : "muted"}>
+                {status.live_chain ? "XRPL Devnet" : "Local demo"}
+              </Pill>
+            </span>
           )}
         </nav>
       </header>

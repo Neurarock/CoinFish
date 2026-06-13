@@ -54,7 +54,9 @@ def main() -> None:
 
     out = {
         "issuer_seed": issuer.seed,
+        "issuer_address": issuer.address,
         "operator_seed": operator.seed,
+        "operator_address": operator.address,
         "domain_id": domain_id,
         "pools": pools_out,
     }

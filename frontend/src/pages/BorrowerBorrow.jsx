@@ -48,6 +48,7 @@ export default function BorrowerBorrow() {
         text: `Disbursed ${rlusd(r.principal)} to ${r.disbursed_to.slice(0, 12)}…. Wallet balance ${rlusd(r.wallet_balance)}.`,
         tx_hash: r.tx_hash,
         explorer_url: r.explorer_url,
+        receipt_url: r.receipt_url,
       });
       setQuote(null);
       setTimeout(() => nav("/borrower/dashboard"), 1200);
@@ -122,7 +123,11 @@ export default function BorrowerBorrow() {
       {msg && (
         <div className="mt-4 text-sm" style={{ color: msg.error ? "var(--bad)" : "var(--accent)" }}>
           {msg.error || msg.text}
-          <VerifyLink href={msg.explorer_url} hash={msg.tx_hash} />
+          <VerifyLink
+            href={msg.explorer_url || msg.receipt_url}
+            hash={msg.tx_hash}
+            label={msg.explorer_url ? "Verify on XRPL" : "Demo receipt"}
+          />
         </div>
       )}
     </Layout>

@@ -15,7 +15,8 @@ from sqlmodel import Session, select
 
 from . import config
 from . import db
-from .db import Account, AuthSession, CheckStatus, FiatLedger, Role
+from .db import Account, AuthSession, CheckStatus, FiatLedger, OnChainTx, Role
+from .runtime import LIVE_CHAIN, REQUIRE_DEVNET_TRANSACTIONS
 from .schemas import AccountOut
 
 # in-memory token store: token -> account_id (demo only)
@@ -115,11 +116,67 @@ def account_out(acct: Account) -> AccountOut:
 
 
 def explorer_account(address: str) -> str:
-    return f"{config.EXPLORER}/accounts/{address}" if address else ""
+    return f"{config.EXPLORER}/accounts/{address}" if LIVE_CHAIN and address else ""
 
 
 def explorer_tx(tx_hash: str) -> str:
-    return f"{config.EXPLORER}/transactions/{tx_hash}" if tx_hash else ""
+    return f"{config.EXPLORER}/transactions/{tx_hash}" if LIVE_CHAIN and tx_hash else ""
+
+
+def receipt_url(receipt_id: str) -> str:
+    return f"/api/receipts/{receipt_id}" if receipt_id and not LIVE_CHAIN else ""
+
+
+def tx_out(row: OnChainTx) -> dict:
+    return {
+        "id": row.id,
+        "account_id": row.account_id,
+        "action": row.action,
+        "tx_hash": row.tx_hash,
+        "explorer_url": row.explorer_url,
+        "engine_result": row.engine_result,
+        "pool_key": row.pool_key,
+        "loan_id": row.loan_id,
+        "amount": row.amount,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+def record_onchain_tx(
+    session: Session,
+    *,
+    account_id: int | None,
+    action: str,
+    tx_hash: str,
+    engine_result: str = "",
+    pool_key: str = "",
+    loan_id: int | None = None,
+    amount: float = 0.0,
+) -> OnChainTx:
+    row = OnChainTx(
+        account_id=account_id,
+        action=action,
+        tx_hash=tx_hash,
+        explorer_url=explorer_tx(tx_hash),
+        engine_result=engine_result,
+        pool_key=pool_key,
+        loan_id=loan_id,
+        amount=round(amount or 0.0, 6),
+    )
+    session.add(row)
+    return row
+
+
+def require_devnet_transactions(action: str) -> None:
+    if REQUIRE_DEVNET_TRANSACTIONS and not LIVE_CHAIN:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"{action} must be submitted on XRPL Devnet. Start the backend with "
+                "COINFISH_LIVE_CHAIN=1 after running bootstrap_devnet.py. For local "
+                "developer-only tests set COINFISH_REQUIRE_DEVNET_TRANSACTIONS=0."
+            ),
+        )
 
 
 def adjust_wallet_balance(session: Session, acct: Account, delta: float) -> None:

@@ -29,8 +29,10 @@ uvicorn backend.main:app --reload
 
 Defines the off-chain SQLModel tables used by the UX demo:
 
-- `Account` stores role, company details, simulated KYC/credit state, and demo
-  wallet mapping.
+- `Account` stores role, company details, simulated KYC/credit state, selected
+  XRPL wallet provider, wallet address, and demo RLUSD wallet balance.
+- `AuthSession` persists demo bearer tokens so refresh/backend reloads can keep
+  the same logged-in account.
 - `FiatLedger` stores borrower fiat collateral movements.
 - `Deposit` stores lender positions.
 - `Loan` stores accepted borrower loans and policy metadata.
@@ -61,7 +63,8 @@ Shared backend helpers:
 - lightweight demo password hashing and token issuing;
 - FastAPI dependencies for current account, session, and role gating;
 - account serialization;
-- collateral balance math.
+- collateral balance math;
+- wallet balance and XRPL explorer URL helpers.
 
 The collateral helpers deliberately treat `lock` and `release` rows as
 informational ring-fencing, not custody movements. This avoids double-counting
@@ -73,18 +76,21 @@ Implements the onboarding journey:
 
 - signup/login;
 - orange-to-green simulated KYC and credit checks;
-- wallet connection;
+- provider-style XRPL wallet connection;
 - current account lookup.
 
-There is no real email verification, KYC provider, credit bureau, or wallet
-browser integration. The endpoints are there to make the product journey visible
-and clickable.
+There is no real email verification, KYC provider, credit bureau, or wallet SDK
+integration yet. The wallet flow records a chosen XRPL provider such as Xaman or
+Crossmark, the connected address, and a demo balance so it behaves like a signer
+connection without requiring a browser extension during the proof of concept.
 
 ### `backend/routers/lenders.py`
 
 Implements lender deposit, dashboard, and withdrawal. Withdrawals use the existing
 `ExitQueue` service so a lender either exits immediately or receives a queued /
-partial status when the pool lacks idle liquidity.
+partial status when the pool lacks idle liquidity. Filled withdrawal amounts are
+subtracted from dashboard principal and added back to the persisted wallet
+balance.
 
 ### `backend/routers/borrowers.py`
 
@@ -133,7 +139,7 @@ frontend calls this file rather than embedding endpoint strings inside pages.
 
 The auth/session context. It stores the current account and bearer token in
 `sessionStorage`, restores them on refresh, and exposes login/signup/logout helpers
-to the pages.
+to the pages. The backend also persists the token in SQLite.
 
 ### `frontend/src/index.css`
 
@@ -160,21 +166,22 @@ legible without replacing the financial metrics.
 ### `frontend/src/pages/Landing.jsx`
 
 The login/signup and onboarding screen. Signup collects company information, then
-shows simulated KYC, simulated credit for borrowers, and wallet connection. Once
-the relevant buttons are green and a wallet exists, the user can enter the role
-journey.
+shows simulated KYC, simulated credit for borrowers, and provider-style XRPL wallet
+connection. Once the relevant buttons are green and a wallet exists, the user can
+enter the role journey.
 
 ### `frontend/src/pages/LenderDeposit.jsx`
 
 The lender's first post-login screen. It shows professional risk warnings, the
 three pool cards, wallet status, and a deposit form. Successful deposits refresh
-pool data and show the returned transaction hash.
+pool data, update persisted wallet balance, and show the returned transaction hash
+with an XRPL explorer verification link.
 
 ### `frontend/src/pages/LenderDashboard.jsx`
 
 Shows the lender's total deposited amount, estimated yield, pool positions,
 utilisation tanks, and withdrawal flow. Queued withdrawals are shown in the exit
-queue table.
+queue table, and filled withdrawals reduce the displayed principal.
 
 ### `frontend/src/pages/BorrowerCollateral.jsx`
 
@@ -222,8 +229,8 @@ or future detail pages.
 `frontend/src/components/CheckButton.jsx` is the orange-to-green KYC/credit button.
 `frontend/src/components/QrCode.jsx` renders a deterministic QR-like code for the
 bank transfer payload without adding a dependency.
-`frontend/src/components/ui.jsx` contains small shared UI atoms and formatting
-helpers.
+`frontend/src/components/ui.jsx` contains small shared UI atoms, formatting
+helpers, and the highlighted `VerifyLink` used for XRPL explorer verification.
 
 ### Frontend project configuration
 

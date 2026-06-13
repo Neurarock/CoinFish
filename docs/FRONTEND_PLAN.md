@@ -79,8 +79,10 @@ After the account is created the card reveals the onboarding steps:
 2. **Credit check button** — borrowers only (lenders skip it entirely). Same
    orange→green flip; on pass the backend assigns a demo credit score that feeds
    the rate engine.
-3. **Connect wallet** — provisions a Devnet wallet for the account (shared by the
-   deposit/borrow flows).
+3. **Connect XRPL signer** — choose Xaman, Crossmark, GemWallet, or a Devnet
+   demo signer. The proof of concept records the chosen provider, XRPL address,
+   account explorer link, and demo RLUSD balance in SQLite so refresh/login keeps
+   the same wallet state.
 
 When KYC (+ credit for borrowers) is green and a wallet is connected, the **Enter
 app** button activates and routes into the right world. **Login** is a simple
@@ -91,13 +93,14 @@ Headline + a professional **risk notice** (not bank deposits, capital at risk,
 variable yield, exit-queue behaviour, first-loss ≠ no-loss, Devnet demo). Then the
 **three pools** as cards, each disclosing: net & base APR, first-loss buffer %,
 first-loss capital, idle/available liquidity, and a `PoolWater` tank showing how
-saturated it is. Selecting a pool opens a deposit panel ("Connect wallet &
-deposit"). On success it shows the tx hash and refreshes pool numbers.
+saturated it is. Selecting a pool opens a deposit panel. On success it shows a
+highlighted **Verify on XRPL** link, updates the persisted wallet balance, and
+refreshes pool numbers.
 
 ### 3.3 Lender · Dashboard (`pages/LenderDashboard.jsx`)
 Top stats: total deposited, vault shares, accrued yield (estimate). Then a card per
-**position** with its live `PoolWater` saturation, your principal, your yield, and a
-**withdraw** input. Withdraw outcomes:
+**position** with its live `PoolWater` saturation, your current principal after
+filled withdrawals, your yield, and a **withdraw** input. Withdraw outcomes:
 
 - **Settles immediately** (green) when idle liquidity covers it.
 - **Queued / partial** (amber) when the pool is heavily lent out — the message
@@ -118,8 +121,9 @@ Cards for each pool tagged **eligible / not eligible** based on available
 collateral and current LTV, showing from-APR, max borrow, current LTV, pool
 liquidity. Pick an eligible pool, enter amount + term (≤24h), **Request quote**.
 The quote is **live for 5 seconds**: a circular countdown ring runs down; **Accept**
-within the window disburses RLUSD to the connected wallet (shows the tx hash, then
-routes to the dashboard). After 0s the button flips to "Expired — re-quote".
+within the window disburses RLUSD to the connected wallet (shows the highlighted
+XRPL explorer verification link, then routes to the dashboard). After 0s the
+button flips to "Expired — re-quote".
 
 ### 3.6 Borrower · Dashboard (`pages/BorrowerDashboard.jsx`)
 Stats: total borrowed, outstanding, interest paid, available collateral. An itemised
@@ -130,14 +134,15 @@ collateral + a clearly-shown default charge, then the loan is marked defaulted a
 the charge appears in the bill).
 
 ### 3.7 CoinFish · Vault dashboard (`pages/VaultDashboard.jsx`)
-The operator control room, pool-blue. Stats: **fees collected**, total TVL, out on
-loan, first-loss capital. A solvency pill (**buoyant** vs **⚠ underwater**, with the
-solvency ratio); when underwater a full-bleed rising-water overlay with swimming
-fish washes over the page. A **risk-score** half-gauge (0–100, low/elevated/critical)
-computed from utilisation + first-loss coverage. Per-pool `PoolWater` saturation.
-Finally the **critical section**: loans inside the grace window about to default,
-each showing time-to-default (or hours overdue) and a control to **extend grace by N
-hours**. The page polls every 5s so it feels live.
+The operator control room, pool-blue but restrained. Stats: **fees collected**,
+total TVL, out on loan, first-loss capital. A solvency pill (**solvent** vs
+**underwater**, with the solvency ratio); when underwater a subtle liquidity-pressure
+overlay appears behind the page. A **risk-score** half-gauge (0–100,
+low/elevated/critical) computed from utilisation + first-loss coverage. Per-pool
+`PoolWater` saturation renders in professional mode. Finally the **critical
+section**: loans inside the grace window about to default, each showing
+time-to-default (or hours overdue) and a control to **extend grace by N hours**.
+The page polls every 5s so it feels live.
 
 ---
 
@@ -158,7 +163,8 @@ hours**. The page polls every 5s so it feels live.
 ## 5. State & data flow
 
 - **Auth:** `store.jsx` holds `{account, token}`; `api.js` attaches the bearer
-  token. Token + account cached in `sessionStorage` so a refresh keeps you in.
+  token. Token + account cached in `sessionStorage`, and the backend also stores
+  demo session tokens in SQLite so refresh/login keeps the same account and wallet.
 - **Reads:** each dashboard calls its `*/me/dashboard` (or `/pools`, `/admin/
   dashboard`) on mount; the vault polls every 5s.
 - **Writes:** deposit / withdraw / quote / accept / repay / default / grace all
@@ -195,7 +201,7 @@ network; set `COINFISH_LIVE_CHAIN=1` to route deposits/loans/repays through Devn
 
 ## 8. Future polish (not in the scaffold)
 
-Live tx-hash → explorer links on every action card; a websocket feed so lender and
-vault dashboards update without polling; a borrower "rollover at maturity" flow;
-per-pool historical APR sparklines; and the ZK-solvency badge from SPEC §12 surfaced
-on the lender deposit screen.
+A websocket feed so lender and vault dashboards update without polling; a borrower
+"rollover at maturity" flow; per-pool historical APR sparklines; real Xaman /
+Crossmark / GemWallet SDK integration; and the ZK-solvency badge from SPEC §12
+surfaced on the lender deposit screen.

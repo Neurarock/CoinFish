@@ -14,7 +14,8 @@ loan disbursement, and transaction hashes are simulated unless
 - **Base URL:** `/`
 - **Frontend dev proxy:** Vite proxies `/api` to `http://localhost:8000`.
 - **Auth:** login/signup returns an opaque bearer token. Send it as
-  `Authorization: Bearer <token>`.
+  `Authorization: Bearer <token>`. Demo tokens are persisted in SQLite so browser
+  refreshes and backend reloads do not immediately orphan the session.
 - **Roles:** `lender` and `borrower` routes are role-gated. The vault dashboard is
   open for the demo so evaluators can inspect it without creating an admin user.
 - **Persistence:** SQLModel/SQLite stores accounts, fiat-collateral ledger rows,
@@ -104,6 +105,9 @@ Response:
     "credit_status": "pending",
     "credit_score": 0,
     "xrpl_address": "",
+    "wallet_provider": "",
+    "wallet_rlusd_balance": 0,
+    "wallet_explorer_url": "",
     "wallet_connected": false
   }
 }
@@ -143,15 +147,26 @@ Response: `AccountOut`
 
 ### `POST /auth/wallet/connect`
 
-Connects a wallet. In demo mode this provisions a plausible XRPL address; in
-live-chain mode it creates a faucet wallet and trustline.
+Connects an XRPL signer. In the demo, the frontend lets the user choose Xaman,
+Crossmark, GemWallet, or a Devnet signer and optionally provide an address. The
+backend records provider, address, account explorer link, and persisted demo RLUSD
+balance. In live-chain mode it creates a faucet wallet and trustline.
+
+Request:
+
+```json
+{ "provider": "crossmark", "address": "r..." }
+```
+
+`address` is optional in demo mode.
 
 Response:
 
 ```json
 {
   "xrpl_address": "r...",
-  "rlusd_balance": 0,
+  "provider": "crossmark",
+  "rlusd_balance": 500000,
   "explorer_url": "https://devnet.xrpl.org/accounts/r..."
 }
 ```
@@ -174,6 +189,8 @@ Response:
 {
   "ok": true,
   "tx_hash": "DEMO_HASH",
+  "explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH",
+  "wallet_balance": 475000,
   "pool": { "key": "med", "tvl": 345000, "drawn": 210000 }
 }
 ```
@@ -206,13 +223,17 @@ Response:
   "remaining": 3800,
   "queued": true,
   "message": "Pool liquidity is low...",
-  "tx_hashes": ["DEMO_HASH"]
+  "tx_hashes": ["DEMO_HASH"],
+  "explorer_urls": ["https://devnet.xrpl.org/transactions/DEMO_HASH"],
+  "wallet_balance": 480000
 }
 ```
 
 ### `GET /lenders/me/dashboard`
 
-Returns lender holdings, estimated yield, and exit queue rows.
+Returns lender holdings, estimated yield, and exit queue rows. Filled withdrawal
+amounts are subtracted from `total_deposited`, `total_shares`, and each
+position's `your_principal`.
 
 Response:
 
@@ -349,6 +370,8 @@ Response:
   "ok": true,
   "loan_id": 1,
   "tx_hash": "DEMO_HASH",
+  "explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH",
+  "wallet_balance": 40000,
   "disbursed_to": "r...",
   "principal": 40000
 }
@@ -379,6 +402,20 @@ or:
 Full repayment is blocked until half the term has elapsed, so the UI can show the
 minimum-term warning. Interest-only repayment is available immediately.
 
+Response includes a transaction hash and explorer URL for the payment action:
+
+```json
+{
+  "ok": true,
+  "mode": "interest",
+  "interest_paid": 9.04,
+  "outstanding": 40000,
+  "tx_hash": "DEMO_HASH",
+  "explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH",
+  "wallet_balance": 39990.96
+}
+```
+
 ### `POST /borrowers/loans/{loan_id}/default`
 
 Lets the borrower explicitly default at any time. The demo seizes the principal
@@ -391,7 +428,9 @@ Response:
   "ok": true,
   "status": "defaulted",
   "default_charge": 2050,
-  "collateral_seized": 42050
+  "collateral_seized": 42050,
+  "tx_hash": "DEMO_HASH",
+  "explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH"
 }
 ```
 
@@ -423,6 +462,7 @@ Response:
       "pool_key": "low",
       "principal": 40000,
       "status": "active",
+      "origination_explorer_url": "https://devnet.xrpl.org/transactions/DEMO_HASH",
       "due_at": "2026-06-14T12:00:00"
     }
   ],
@@ -497,7 +537,7 @@ status from the XRPL service layer.
 
 - Persist runtime pool balances and fee totals so a backend restart does not reset
   demo liquidity.
-- Replace the in-memory token map with signed tokens or a database-backed session
+- Replace demo bearer tokens with signed tokens or a production-grade session
   table.
 - Add a websocket/SSE feed for pool and vault metrics instead of polling.
 - Model borrower maturity/default timers as scheduled jobs instead of dashboard

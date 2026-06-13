@@ -10,19 +10,21 @@ from __future__ import annotations
 
 import random
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlmodel import Session, select
 
 from .. import db
 from ..db import Account, CheckStatus, Role
 from ..runtime import LIVE_CHAIN, rt
-from ..schemas import AccountOut, LoginIn, SignupIn, TokenOut, WalletOut
+from ..schemas import AccountOut, LoginIn, SignupIn, TokenOut, WalletConnectIn, WalletOut
 from ..services import (
     account_out,
     current_account,
+    explorer_account,
     hash_password,
     issue_token,
     session_dep,
+    set_wallet_connected,
     verify_password,
 )
 
@@ -49,7 +51,7 @@ def signup(body: SignupIn, session: Session = Depends(session_dep)) -> TokenOut:
     session.add(acct)
     session.commit()
     session.refresh(acct)
-    return TokenOut(token=issue_token(acct.id), account=account_out(acct))
+    return TokenOut(token=issue_token(acct.id, session), account=account_out(acct))
 
 
 @router.post("/login", response_model=TokenOut)
@@ -57,7 +59,7 @@ def login(body: LoginIn, session: Session = Depends(session_dep)) -> TokenOut:
     acct = session.exec(select(Account).where(Account.email == body.email)).first()
     if not acct or not verify_password(body.password, acct.password_hash):
         raise HTTPException(401, "invalid credentials")
-    return TokenOut(token=issue_token(acct.id), account=account_out(acct))
+    return TokenOut(token=issue_token(acct.id, session), account=account_out(acct))
 
 
 @router.post("/verify/kyc", response_model=AccountOut)
@@ -84,17 +86,27 @@ def verify_credit(acct: Account = Depends(current_account), session: Session = D
 
 
 @router.post("/wallet/connect", response_model=WalletOut)
-def connect_wallet(acct: Account = Depends(current_account), session: Session = Depends(session_dep)):
-    """Connect (in demo: provision) a Devnet wallet for the account.
+def connect_wallet(
+    body: WalletConnectIn | None = Body(default=None),
+    acct: Account = Depends(current_account),
+    session: Session = Depends(session_dep),
+):
+    """Connect a wallet-style signer for the account.
 
-    In LIVE_CHAIN mode this funds a fresh faucet wallet and sets a trustline to
-    the CoinFish RLUSD issuer; in demo mode it fabricates a plausible address so
-    the UI flow works offline.
+    In production this would be a Xaman/Crossmark/GemWallet sign-in and later
+    sign request. In demo mode we record the chosen provider, address and RLUSD
+    balance in SQLite so refresh/login keeps the same wallet.
     """
+    body = body or WalletConnectIn()
     if acct.xrpl_address:
         bal = _rlusd_balance(acct.xrpl_address)
-        return WalletOut(xrpl_address=acct.xrpl_address, rlusd_balance=bal,
-                         explorer_url=_explorer(acct.xrpl_address))
+        if LIVE_CHAIN:
+            acct.wallet_rlusd_balance = bal
+            session.add(acct)
+            session.commit()
+        return WalletOut(xrpl_address=acct.xrpl_address, provider=acct.wallet_provider or body.provider,
+                         rlusd_balance=acct.wallet_rlusd_balance or bal,
+                         explorer_url=explorer_account(acct.xrpl_address))
 
     if LIVE_CHAIN:
         from ..xrpl_service import assets
@@ -102,14 +114,16 @@ def connect_wallet(acct: Account = Depends(current_account), session: Session = 
         client = get_client()
         w = fund_wallet(client)
         assets.create_trustline(w, rt.issuer_address, client)
-        acct.xrpl_address, acct.xrpl_seed = w.address, w.seed
+        address, seed, balance = w.address, w.seed, _rlusd_balance(w.address)
     else:
-        acct.xrpl_address = "r" + _rand_b58(33)
-        acct.xrpl_seed = "sEd" + _rand_b58(26)
-    session.add(acct)
+        address = body.address.strip() or ("r" + _rand_b58(33))
+        seed = "external-signer" if body.address else "sEd" + _rand_b58(26)
+        balance = 500_000.0 if acct.role == Role.LENDER else 0.0
+    set_wallet_connected(session, acct, provider=body.provider, address=address, seed=seed, balance=balance)
     session.commit()
-    return WalletOut(xrpl_address=acct.xrpl_address, rlusd_balance=0.0,
-                     explorer_url=_explorer(acct.xrpl_address))
+    return WalletOut(xrpl_address=acct.xrpl_address, provider=acct.wallet_provider,
+                     rlusd_balance=acct.wallet_rlusd_balance,
+                     explorer_url=explorer_account(acct.xrpl_address))
 
 
 @router.get("/me", response_model=AccountOut)
@@ -118,11 +132,6 @@ def me(acct: Account = Depends(current_account)) -> AccountOut:
 
 
 # --- helpers -----------------------------------------------------------------
-def _explorer(address: str) -> str:
-    from .. import config
-    return f"{config.EXPLORER}/accounts/{address}"
-
-
 def _rand_b58(n: int) -> str:
     alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
     return "".join(random.choice(alphabet) for _ in range(n))

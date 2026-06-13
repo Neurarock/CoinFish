@@ -19,6 +19,7 @@ from ..schemas import (
     WithdrawIn,
 )
 from ..services import account_out, require_role, session_dep
+from ..services import adjust_wallet_balance, explorer_tx
 from .pools import pool_out
 
 router = APIRouter(prefix="/lenders", tags=["lenders"])
@@ -55,6 +56,8 @@ def deposit(body: DepositIn, acct: Account = Depends(lender_only),
         raise HTTPException(404, "unknown pool")
     if body.amount <= 0:
         raise HTTPException(400, "amount must be positive")
+    if not LIVE_CHAIN and body.amount > (acct.wallet_rlusd_balance or 0.0) + 1e-6:
+        raise HTTPException(400, f"wallet balance is only {acct.wallet_rlusd_balance:.2f} RLUSD")
 
     tx_hash = rt.fake_tx_hash()
     if LIVE_CHAIN:
@@ -65,11 +68,15 @@ def deposit(body: DepositIn, acct: Account = Depends(lender_only),
         tx_hash = res.hash
 
     pool.tvl += body.amount                       # shares ~ 1:1 in demo
+    if not LIVE_CHAIN:
+        adjust_wallet_balance(session, acct, -body.amount)
     row = Deposit(account_id=acct.id, pool_key=pool.key, principal=body.amount,
                   shares=body.amount, deposit_tx=tx_hash)
     session.add(row)
     session.commit()
-    return {"ok": True, "tx_hash": tx_hash, "pool": pool_out(pool.key).model_dump()}
+    return {"ok": True, "tx_hash": tx_hash, "explorer_url": explorer_tx(tx_hash),
+            "wallet_balance": acct.wallet_rlusd_balance,
+            "pool": pool_out(pool.key).model_dump()}
 
 
 @router.post("/withdraw")
@@ -89,6 +96,8 @@ def withdraw(body: WithdrawIn, acct: Account = Depends(lender_only),
     row = ExitRow(account_id=acct.id, pool_key=pool.key,
                   amount_requested=req.amount_requested,
                   amount_filled=req.amount_filled, status=req.status.value)
+    if not LIVE_CHAIN and req.amount_filled > 0:
+        adjust_wallet_balance(session, acct, req.amount_filled)
     session.add(row)
     session.commit()
     queued = req.status.value != "filled"
@@ -102,6 +111,8 @@ def withdraw(body: WithdrawIn, acct: Account = Depends(lender_only),
                     "Pool liquidity is low — the remainder is queued and will "
                     "drain as loans repay (within one 24h term)."),
         "tx_hashes": req.tx_hashes,
+        "explorer_urls": [explorer_tx(h) for h in req.tx_hashes],
+        "wallet_balance": acct.wallet_rlusd_balance,
     }
 
 
@@ -112,10 +123,20 @@ def dashboard(acct: Account = Depends(lender_only),
     positions = []
     total_dep = total_shares = accrued = 0.0
     by_pool: dict[str, float] = {}
+    withdrawals = session.exec(select(ExitRow).where(ExitRow.account_id == acct.id)).all()
+    withdrawn_by_pool: dict[str, float] = {}
+    for w in withdrawals:
+        withdrawn_by_pool[w.pool_key] = withdrawn_by_pool.get(w.pool_key, 0.0) + w.amount_filled
     for d in deposits:
         by_pool[d.pool_key] = by_pool.get(d.pool_key, 0.0) + d.principal
-        total_dep += d.principal
-        total_shares += d.shares
+    for pool_key, deposited in list(by_pool.items()):
+        principal = round(max(0.0, deposited - withdrawn_by_pool.get(pool_key, 0.0)), 2)
+        if principal <= 0:
+            by_pool.pop(pool_key, None)
+            continue
+        by_pool[pool_key] = principal
+        total_dep += principal
+        total_shares += principal
     for pool_key, principal in by_pool.items():
         pool = rt.pools[pool_key]
         yield_est = round(principal * pool.base_apr * (1 - 0.03) / 365, 2)  # ~1 day accrual
@@ -125,9 +146,8 @@ def dashboard(acct: Account = Depends(lender_only),
             "your_principal": round(principal, 2),
             "your_yield": yield_est,
         })
-    exits = session.exec(select(ExitRow).where(ExitRow.account_id == acct.id)).all()
     exit_q = [{"pool_key": e.pool_key, "amount_requested": e.amount_requested,
-               "amount_filled": e.amount_filled, "status": e.status} for e in exits]
+               "amount_filled": e.amount_filled, "status": e.status} for e in withdrawals]
     return LenderDashboardOut(
         account=account_out(acct),
         total_deposited=round(total_dep, 2),

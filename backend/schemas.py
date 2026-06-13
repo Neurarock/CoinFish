@@ -30,6 +30,9 @@ class AccountOut(BaseModel):
     credit_status: str
     credit_score: int
     xrpl_address: str
+    wallet_provider: str = ""
+    wallet_rlusd_balance: float = 0.0
+    wallet_explorer_url: str = ""
     wallet_connected: bool
 
 
@@ -41,8 +44,14 @@ class TokenOut(BaseModel):
 # --- wallet ------------------------------------------------------------------
 class WalletOut(BaseModel):
     xrpl_address: str
+    provider: str
     rlusd_balance: float
     explorer_url: str
+
+
+class WalletConnectIn(BaseModel):
+    provider: str = "devnet"
+    address: str = ""
 
 
 # --- lender ------------------------------------------------------------------

@@ -28,8 +28,10 @@ from ..schemas import (
 )
 from ..services import (
     account_out,
+    adjust_wallet_balance,
     collateral_balance,
     collateral_locked,
+    explorer_tx,
     require_role,
     session_dep,
 )
@@ -176,6 +178,8 @@ def accept_quote(body: AcceptQuoteIn, acct: Account = Depends(borrower_only),
                            amount=-q.principal, reference=f"loan {q.id}"))
     pool.drawn += q.principal
     rt.fees_collected += q.origination_fee
+    if not LIVE_CHAIN:
+        adjust_wallet_balance(session, acct, q.principal)
     loan = Loan(account_id=acct.id, pool_key=q.pool_key, principal=q.principal,
                 interest_rate=q.interest_rate, term_hours=q.term_hours,
                 origination_fee=q.origination_fee, status=LoanStatus.ACTIVE,
@@ -186,6 +190,7 @@ def accept_quote(body: AcceptQuoteIn, acct: Account = Depends(borrower_only),
     session.refresh(loan)
     del rt.quotes[q.id]
     return {"ok": True, "loan_id": loan.id, "tx_hash": tx_hash,
+            "explorer_url": explorer_tx(tx_hash), "wallet_balance": acct.wallet_rlusd_balance,
             "disbursed_to": acct.xrpl_address, "principal": q.principal}
 
 
@@ -200,12 +205,19 @@ def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
 
     interest_due = round(loan.principal * loan.interest_rate * loan.term_hours / (365 * 24), 2)
     if body.mode == "interest":
+        if not LIVE_CHAIN and interest_due > (acct.wallet_rlusd_balance or 0.0) + 1e-6:
+            raise HTTPException(400, f"wallet balance is only {acct.wallet_rlusd_balance:.2f} RLUSD")
+        tx_hash = rt.fake_tx_hash()
         loan.interest_paid += interest_due
         rt.fees_collected += round(interest_due * config.MANAGEMENT_FEE, 2)
+        if not LIVE_CHAIN:
+            adjust_wallet_balance(session, acct, -interest_due)
         session.add(loan)
         session.commit()
         return {"ok": True, "mode": "interest", "interest_paid": interest_due,
-                "outstanding": loan.principal}
+                "outstanding": loan.principal, "tx_hash": tx_hash,
+                "explorer_url": explorer_tx(tx_hash),
+                "wallet_balance": acct.wallet_rlusd_balance}
 
     if body.mode == "full":
         elapsed = (datetime.utcnow() - loan.created_at).total_seconds() / 3600
@@ -216,17 +228,25 @@ def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
                 f"Minimum term not met: this loan must be held at least "
                 f"{min_hold:.1f}h before full repayment (held {elapsed:.1f}h). "
                 f"Pay interest only, or wait.")
+        repay_total = round(loan.principal + interest_due, 2)
+        if not LIVE_CHAIN and repay_total > (acct.wallet_rlusd_balance or 0.0) + 1e-6:
+            raise HTTPException(400, f"wallet balance is only {acct.wallet_rlusd_balance:.2f} RLUSD")
+        tx_hash = rt.fake_tx_hash()
         loan.interest_paid += interest_due
         loan.status = LoanStatus.REPAID
         rt.pools[loan.pool_key].drawn = max(0.0, rt.pools[loan.pool_key].drawn - loan.principal)
         rt.fees_collected += round(interest_due * config.MANAGEMENT_FEE, 2)
+        if not LIVE_CHAIN:
+            adjust_wallet_balance(session, acct, -repay_total)
         # release locked collateral
         session.add(FiatLedger(account_id=acct.id, entry_type="release",
                                amount=loan.principal, reference=f"loan {loan.id} repaid"))
         session.add(loan)
         session.commit()
         return {"ok": True, "mode": "full", "interest_paid": loan.interest_paid,
-                "principal_repaid": loan.principal, "status": "repaid"}
+                "principal_repaid": loan.principal, "status": "repaid",
+                "tx_hash": tx_hash, "explorer_url": explorer_tx(tx_hash),
+                "wallet_balance": acct.wallet_rlusd_balance}
 
     raise HTTPException(400, "mode must be 'interest' or 'full'")
 
@@ -241,6 +261,7 @@ def default_loan(loan_id: int, acct: Account = Depends(borrower_only),
     if loan.status != LoanStatus.ACTIVE:
         raise HTTPException(400, f"loan is {loan.status.value}")
     default_charge = round(loan.principal * 0.05 + config.FIXED_SERVICE_FEE, 2)
+    tx_hash = rt.fake_tx_hash()
     loan.default_charge = default_charge
     loan.status = LoanStatus.DEFAULTED
     rt.pools[loan.pool_key].drawn = max(0.0, rt.pools[loan.pool_key].drawn - loan.principal)
@@ -252,7 +273,8 @@ def default_loan(loan_id: int, acct: Account = Depends(borrower_only),
     session.add(loan)
     session.commit()
     return {"ok": True, "status": "defaulted", "default_charge": default_charge,
-            "collateral_seized": round(loan.principal + default_charge, 2)}
+            "collateral_seized": round(loan.principal + default_charge, 2),
+            "tx_hash": tx_hash, "explorer_url": explorer_tx(tx_hash)}
 
 
 # --- dashboard ---------------------------------------------------------------
@@ -273,6 +295,7 @@ def dashboard(acct: Account = Depends(borrower_only),
         "interest_paid": round(l.interest_paid, 2), "status": l.status.value,
         "default_charge": l.default_charge,
         "origination_tx": l.origination_tx,
+        "origination_explorer_url": explorer_tx(l.origination_tx),
         "due_at": l.due_at.isoformat() if l.due_at else None,
     } for l in loans]
     bill = {

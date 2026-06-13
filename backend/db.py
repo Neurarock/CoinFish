@@ -12,14 +12,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+import os
 from typing import Optional
 
+from sqlalchemy import text
 from sqlmodel import Field, Session, SQLModel, create_engine
 
-from . import config
-
 # A single file next to the backend package. Override with COINFISH_DB_URL.
-import os
 
 DB_URL = os.getenv("COINFISH_DB_URL", "sqlite:///./coinfish.db")
 engine = create_engine(DB_URL, echo=False, connect_args={"check_same_thread": False})
@@ -58,10 +57,21 @@ class Account(SQLModel, table=True):
     kyc_status: CheckStatus = CheckStatus.PENDING
     credit_status: CheckStatus = CheckStatus.PENDING
     credit_score: int = 0            # filled by the simulated credit check
-    # connected XRPL wallet (a Devnet faucet wallet we custody for the demo)
+    # connected XRPL wallet (a Devnet faucet wallet / simulated external signer)
     xrpl_address: str = ""
     xrpl_seed: str = ""              # Devnet throwaway only
+    wallet_provider: str = ""        # xaman | crossmark | gemwallet | devnet
+    wallet_rlusd_balance: float = 0.0
+    wallet_connected_at: Optional[datetime] = None
     credential_id: str = ""          # set once the borrower credential is accepted
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AuthSession(SQLModel, table=True):
+    """Persisted demo session token so browser refresh survives backend restarts."""
+
+    token: str = Field(primary_key=True)
+    account_id: int = Field(index=True, foreign_key="account.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -126,7 +136,24 @@ class ExitRow(SQLModel, table=True):
 
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
+    _ensure_account_columns()
 
 
 def get_session() -> Session:
     return Session(engine)
+
+
+def _ensure_account_columns() -> None:
+    """SQLite create_all does not add new columns to an existing demo DB."""
+    if not DB_URL.startswith("sqlite"):
+        return
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(account)"))}
+        additions = {
+            "wallet_provider": "VARCHAR DEFAULT ''",
+            "wallet_rlusd_balance": "FLOAT DEFAULT 0.0",
+            "wallet_connected_at": "DATETIME",
+        }
+        for name, ddl in additions.items():
+            if name not in cols:
+                conn.execute(text(f"ALTER TABLE account ADD COLUMN {name} {ddl}"))

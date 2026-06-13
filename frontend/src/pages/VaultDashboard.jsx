@@ -1,7 +1,5 @@
-// CoinFish's own dashboard (swimming-pool blue). Shows fee revenue, solvency
-// (with an "underwater" overlay effect when liabilities exceed assets), a risk
-// gauge, per-pool saturation, and the CRITICAL section: loans inside the grace
-// window about to default, each with a control to extend grace by N hours.
+// CoinFish's operator dashboard. Shows fee revenue, solvency, risk, pool
+// saturation, and loans inside the grace window with a control to extend grace.
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
@@ -30,10 +28,15 @@ export default function VaultDashboard() {
     <Layout role="admin">
       {d.underwater && <Underwater />}
       <div className="relative z-10">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-extrabold">CoinFish vault</h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-extrabold">CoinFish vault</h1>
+            <p className="mt-1 text-sm" style={{ color: "var(--fg-soft)" }}>
+              Treasury position, liquidity depth, platform fees, and borrower default risk.
+            </p>
+          </div>
           <Pill tone={d.underwater ? "bad" : "good"}>
-            {d.underwater ? "⚠ underwater" : "buoyant"} · solvency {d.solvency_ratio}×
+            {d.underwater ? "underwater" : "solvent"} · {d.solvency_ratio}×
           </Pill>
         </div>
 
@@ -46,15 +49,30 @@ export default function VaultDashboard() {
 
         <div className="mt-6 grid gap-5 md:grid-cols-3">
           <div className="card p-5 md:col-span-1">
-            <div className="font-bold">Risk score</div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--fg-soft)" }}>
+                  Composite risk
+                </div>
+                <div className="font-bold">Vault exposure score</div>
+              </div>
+              <Pill tone={d.risk_band === "low" ? "good" : d.risk_band === "critical" ? "bad" : "warn"}>
+                {d.risk_band}
+              </Pill>
+            </div>
             <RiskGauge score={d.risk_score} band={d.risk_band} />
           </div>
           <div className="md:col-span-2 grid gap-5 sm:grid-cols-3">
             {d.pools.map((p) => (
               <div key={p.key} className="card p-4">
-                <div className="font-bold text-sm">{p.name}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-bold text-sm">{p.name}</div>
+                  <Pill tone={p.utilisation > 0.85 ? "bad" : p.utilisation > 0.6 ? "warn" : "good"}>
+                    {pct(p.utilisation)}
+                  </Pill>
+                </div>
                 <div className="my-2">
-                  <PoolWater level={p.utilisation} height={110} label="utilised" />
+                  <PoolWater level={p.utilisation} height={110} label="utilised" playful={false} />
                 </div>
                 <div className="text-xs" style={{ color: "var(--fg-soft)" }}>
                   TVL {rlusd(p.tvl)} · cover {pct(p.first_loss_buffer)}
@@ -66,12 +84,12 @@ export default function VaultDashboard() {
 
         {/* critical section */}
         <h2 className="mt-8 mb-3 text-xl font-bold">
-          Critical · loans in grace window
+          Critical loans
           {d.at_risk_loans.length > 0 && <span className="ml-2"><Pill tone="bad">{d.at_risk_loans.length}</Pill></span>}
         </h2>
         {d.at_risk_loans.length === 0 ? (
           <div className="card p-5" style={{ color: "var(--fg-soft)" }}>
-            Nothing about to default. Calm waters. 🐟
+            No active loans are inside the grace/default window.
           </div>
         ) : (
           <div className="space-y-3">
@@ -126,14 +144,20 @@ function RiskGauge({ score, band }) {
   );
 }
 
-// Full-bleed rising-water overlay when the platform is underwater.
+// Subtle full-page liquidity pressure overlay when the platform is underwater.
 function Underwater() {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      <div className="absolute inset-x-0 bottom-0 h-2/3 animate-bob"
-        style={{ background: "linear-gradient(180deg, rgba(2,40,70,0.25), rgba(2,40,70,0.55))" }} />
-      <div className="absolute left-10 bottom-10 text-4xl animate-swim">🐟</div>
-      <div className="absolute left-0 bottom-24 text-2xl animate-swim" style={{ animationDelay: "3s" }}>🐠</div>
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-70">
+      <div className="absolute inset-x-0 bottom-0 h-2/3"
+        style={{
+          background: "linear-gradient(180deg, rgba(0,112,155,0.04), rgba(0,112,155,0.22))",
+          borderTop: "1px solid rgba(2,119,168,0.35)",
+        }} />
+      <div className="absolute inset-0"
+        style={{
+          backgroundImage: "linear-gradient(rgba(2,119,168,0.10) 1px, transparent 1px), linear-gradient(90deg, rgba(2,119,168,0.08) 1px, transparent 1px)",
+          backgroundSize: "42px 42px",
+        }} />
     </div>
   );
 }

@@ -24,6 +24,17 @@ export function Stat({ label, value, accent }) {
   );
 }
 
+export function VerifyLink({ href, hash, label = "Verify on XRPL" }) {
+  if (!href) return null;
+  return (
+    <a className="verify-link" href={href} target="_blank" rel="noreferrer">
+      <span className="verify-dot" />
+      <span>{label}</span>
+      {hash && <code>{hash.slice(0, 10)}…</code>}
+    </a>
+  );
+}
+
 export function Pill({ children, tone = "accent" }) {
   const map = {
     accent: ["var(--accent)", "var(--accent-fg)"],

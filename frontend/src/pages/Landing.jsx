@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../store.jsx";
 import { api } from "../api.js";
-import { Button, Field, Pill } from "../components/ui.jsx";
+import { Button, Field, Pill, VerifyLink, rlusd } from "../components/ui.jsx";
 import CheckButton from "../components/CheckButton.jsx";
 
 const THEME = { lender: "theme-lender", borrower: "theme-borrower" };
@@ -19,13 +19,21 @@ export default function Landing() {
   const [form, setForm] = useState({ company_name: "", company_number: "", contact_name: "", email: "", password: "" });
   const [acct, setAcct] = useState(account || null);
   const [wallet, setWallet] = useState(null);
+  const [walletChoice, setWalletChoice] = useState("xaman");
+  const [walletAddress, setWalletAddress] = useState("");
   const [err, setErr] = useState("");
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const needCredit = role === "borrower";
   const kycDone = acct?.kyc_status === "passed";
   const creditDone = !needCredit || acct?.credit_status === "passed";
-  const ready = acct && kycDone && creditDone && wallet;
+  const connectedWallet = wallet || (acct?.wallet_connected ? {
+    xrpl_address: acct.xrpl_address,
+    provider: acct.wallet_provider,
+    rlusd_balance: acct.wallet_rlusd_balance,
+    explorer_url: acct.wallet_explorer_url,
+  } : null);
+  const ready = acct && kycDone && creditDone && connectedWallet;
 
   async function doSignup(e) {
     e.preventDefault();
@@ -46,8 +54,18 @@ export default function Landing() {
     } catch (e) { setErr(e.message); }
   }
   async function connect() {
-    const w = await api.connectWallet();
+    const w = await api.connectWallet({ provider: walletChoice, address: walletAddress });
     setWallet(w);
+    const next = {
+      ...acct,
+      xrpl_address: w.xrpl_address,
+      wallet_provider: w.provider,
+      wallet_rlusd_balance: w.rlusd_balance,
+      wallet_explorer_url: w.explorer_url,
+      wallet_connected: true,
+    };
+    setAcct(next);
+    patchAccount(next);
   }
   function enter(a = acct) {
     if (a.role === "lender") nav("/lender/deposit");
@@ -117,10 +135,14 @@ export default function Landing() {
                 <CheckButton label="credit" done={creditDone}
                   onPass={async () => patchAndStore(await api.verifyCredit())} />
               )}
-              <Button variant={wallet ? "ghost" : "primary"} className="w-full justify-center"
-                onClick={connect} disabled={!!wallet}>
-                {wallet ? `✓ Wallet ${wallet.xrpl_address.slice(0, 10)}…` : "Connect wallet"}
-              </Button>
+              <WalletConnect
+                wallet={connectedWallet}
+                choice={walletChoice}
+                setChoice={setWalletChoice}
+                address={walletAddress}
+                setAddress={setWalletAddress}
+                onConnect={connect}
+              />
               <Button className="w-full justify-center" disabled={!ready} onClick={() => enter()}>
                 Enter {role} app →
               </Button>
@@ -151,4 +173,59 @@ function RoleTab({ cur, val, set, label, sub }) {
 function TabBtn({ on, ...p }) {
   return <button {...p} className="rounded-full px-3 py-1 font-semibold"
     style={{ background: on ? "var(--accent)" : "transparent", color: on ? "var(--accent-fg)" : "var(--fg-soft)" }} />;
+}
+
+const PROVIDERS = [
+  ["xaman", "Xaman", "Mobile sign request"],
+  ["crossmark", "Crossmark", "Browser extension"],
+  ["gemwallet", "GemWallet", "Browser wallet"],
+  ["devnet", "Devnet signer", "Demo faucet wallet"],
+];
+
+function WalletConnect({ wallet, choice, setChoice, address, setAddress, onConnect }) {
+  if (wallet) {
+    return (
+      <div className="rounded-lg p-3" style={{ border: "1px solid var(--line)", background: "var(--bg)" }}>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>
+              Connected wallet · {wallet.provider || "xrpl"}
+            </div>
+            <div className="font-bold">{wallet.xrpl_address.slice(0, 12)}…{wallet.xrpl_address.slice(-6)}</div>
+          </div>
+          <Pill tone="good">{rlusd(wallet.rlusd_balance)}</Pill>
+        </div>
+        <VerifyLink href={wallet.explorer_url} label="View account on XRPL" />
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3 rounded-lg p-3" style={{ border: "1px solid var(--line)", background: "var(--bg)" }}>
+      <div className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>
+        Connect XRPL signer
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {PROVIDERS.map(([id, name, sub]) => (
+          <button key={id} type="button" onClick={() => setChoice(id)}
+            className="rounded-lg border p-2 text-left"
+            style={{
+              borderColor: choice === id ? "var(--accent)" : "var(--line)",
+              background: choice === id ? "color-mix(in srgb, var(--accent) 10%, var(--bg-soft))" : "var(--bg-soft)",
+            }}>
+            <div className="text-sm font-bold">{name}</div>
+            <div className="text-[11px]" style={{ color: "var(--fg-soft)" }}>{sub}</div>
+          </button>
+        ))}
+      </div>
+      <Field
+        label="Wallet address (optional for demo)"
+        value={address}
+        onChange={(e) => setAddress(e.target.value)}
+        placeholder="r..."
+      />
+      <Button className="w-full justify-center" onClick={onConnect}>
+        Approve sign-in and connect
+      </Button>
+    </div>
+  );
 }

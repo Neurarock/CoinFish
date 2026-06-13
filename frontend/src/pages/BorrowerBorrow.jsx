@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
-import { Button, Pill, rlusd, pct } from "../components/ui.jsx";
+import { Button, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
 
 export default function BorrowerBorrow() {
   const [d, setD] = useState(null);
@@ -15,7 +15,7 @@ export default function BorrowerBorrow() {
   const [term, setTerm] = useState(12);
   const [quote, setQuote] = useState(null);
   const [left, setLeft] = useState(0);
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState(null);
   const timer = useRef(null);
   const nav = useNavigate();
 
@@ -32,22 +32,26 @@ export default function BorrowerBorrow() {
   }
 
   async function getQuote() {
-    setMsg("");
+    setMsg(null);
     try {
       const q = await api.quote({ pool_key: pool, amount: Number(amount), term_hours: Number(term) });
       setQuote(q);
       startCountdown(q.seconds_left);
-    } catch (e) { setMsg(e.message); }
+    } catch (e) { setMsg({ error: e.message }); }
   }
 
   async function accept() {
-    setMsg("");
+    setMsg(null);
     try {
       const r = await api.acceptQuote({ quote_id: quote.id });
-      setMsg(`Disbursed ${rlusd(r.principal)} to ${r.disbursed_to.slice(0, 12)}… (tx ${r.tx_hash.slice(0, 12)}…)`);
+      setMsg({
+        text: `Disbursed ${rlusd(r.principal)} to ${r.disbursed_to.slice(0, 12)}…. Wallet balance ${rlusd(r.wallet_balance)}.`,
+        tx_hash: r.tx_hash,
+        explorer_url: r.explorer_url,
+      });
       setQuote(null);
       setTimeout(() => nav("/borrower/dashboard"), 1200);
-    } catch (e) { setMsg(e.message); }
+    } catch (e) { setMsg({ error: e.message }); }
   }
 
   if (!d) return <Layout role="borrower"><div>Loading…</div></Layout>;
@@ -115,7 +119,12 @@ export default function BorrowerBorrow() {
           )}
         </div>
       )}
-      {msg && <div className="mt-4 text-sm" style={{ color: "var(--accent)" }}>{msg}</div>}
+      {msg && (
+        <div className="mt-4 text-sm" style={{ color: msg.error ? "var(--bad)" : "var(--accent)" }}>
+          {msg.error || msg.text}
+          <VerifyLink href={msg.explorer_url} hash={msg.tx_hash} />
+        </div>
+      )}
     </Layout>
   );
 }

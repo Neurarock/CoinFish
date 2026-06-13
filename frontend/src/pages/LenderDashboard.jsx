@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
-import { Button, Stat, Pill, rlusd, pct } from "../components/ui.jsx";
+import { Button, Stat, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
 
 export default function LenderDashboard() {
   const [d, setD] = useState(null);
@@ -92,7 +92,14 @@ export default function LenderDashboard() {
 function WithdrawMsg({ msg }) {
   if (msg.error) return <div className="mt-2 text-sm" style={{ color: "var(--bad)" }}>{msg.error}</div>;
   const tone = msg.queued ? "var(--warn)" : "var(--good)";
-  return <div className="mt-2 text-sm" style={{ color: tone }}>{msg.message}</div>;
+  return (
+    <div className="mt-2 text-sm" style={{ color: tone }}>
+      <div>{msg.message} Wallet balance {rlusd(msg.wallet_balance)}.</div>
+      {(msg.explorer_urls || []).map((url, i) => (
+        <VerifyLink key={url} href={url} hash={msg.tx_hashes?.[i]} />
+      ))}
+    </div>
+  );
 }
 function Row({ k, v, accent }) {
   return (

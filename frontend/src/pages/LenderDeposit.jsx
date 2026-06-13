@@ -4,24 +4,24 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
-import { Button, Pill, rlusd, pct } from "../components/ui.jsx";
+import { Button, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
 
 export default function LenderDeposit() {
   const [pools, setPools] = useState([]);
   const [sel, setSel] = useState(null);
   const [amount, setAmount] = useState(10000);
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState(null);
 
   const load = () => api.pools().then(setPools);
   useEffect(() => { load(); }, []);
 
   async function deposit() {
-    setMsg("");
+    setMsg(null);
     try {
       const r = await api.deposit({ pool_key: sel, amount: Number(amount) });
-      setMsg(`Deposited — tx ${r.tx_hash.slice(0, 14)}…`);
+      setMsg({ text: `Deposited. Wallet balance ${rlusd(r.wallet_balance)}.`, tx_hash: r.tx_hash, explorer_url: r.explorer_url });
       load();
-    } catch (e) { setMsg(e.message); }
+    } catch (e) { setMsg({ error: e.message }); }
   }
 
   return (
@@ -72,7 +72,12 @@ export default function LenderDeposit() {
             </label>
             <Button onClick={deposit}>Connect wallet & deposit</Button>
           </div>
-          {msg && <div className="mt-3 text-sm" style={{ color: "var(--accent)" }}>{msg}</div>}
+          {msg && (
+            <div className="mt-3 text-sm" style={{ color: msg.error ? "var(--bad)" : "var(--accent)" }}>
+              {msg.error || msg.text}
+              <VerifyLink href={msg.explorer_url} hash={msg.tx_hash} />
+            </div>
+          )}
         </div>
       )}
     </Layout>

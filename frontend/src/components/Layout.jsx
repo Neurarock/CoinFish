@@ -30,7 +30,8 @@ export default function Layout({ role, children }) {
       <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-3"
         style={{ background: "var(--bg-soft)", borderBottom: "1px solid var(--line)" }}>
         <div className="flex items-center gap-2 font-extrabold text-lg">
-          <span className="text-2xl">🐟</span> {TITLE[role] || "CoinFish"}
+          {role !== "admin" && <span className="text-2xl">🐟</span>}
+          {TITLE[role] || "CoinFish"}
         </div>
         <nav className="flex items-center gap-1">
           {links.map(([to, label]) => (

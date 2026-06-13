@@ -32,7 +32,7 @@ export const api = {
   me: () => req("GET", "/auth/me"),
   verifyKyc: () => req("POST", "/auth/verify/kyc"),
   verifyCredit: () => req("POST", "/auth/verify/credit"),
-  connectWallet: () => req("POST", "/auth/wallet/connect"),
+  connectWallet: (b) => req("POST", "/auth/wallet/connect", b),
 
   // pools
   pools: () => req("GET", "/pools"),

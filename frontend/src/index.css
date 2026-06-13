@@ -21,7 +21,7 @@
   --bad: #dc2626;
   --water-top: #38bdf8;
   --water-bot: #0369a1;
-  --radius: 16px;
+  --radius: 8px;
   --card-shadow: 0 8px 30px rgba(2, 32, 71, 0.08);
 }
 
@@ -55,16 +55,16 @@
 
 /* VAULT / COINFISH — swimming-pool blue */
 .theme-vault {
-  --bg: #06618f;
-  --bg-soft: #0a7bb0;
-  --fg: #f0fbff;
-  --fg-soft: #bfe9fb;
-  --line: #1d8dc0;
-  --accent: #fde047;
-  --accent-fg: #06324a;
-  --water-top: #5fd0ff;
-  --water-bot: #0782b8;
-  --card-shadow: 0 14px 40px rgba(0, 30, 50, 0.35);
+  --bg: #e7f8ff;
+  --bg-soft: #f8fdff;
+  --fg: #062033;
+  --fg-soft: #466579;
+  --line: #b7e4f5;
+  --accent: #0277a8;
+  --accent-fg: #ffffff;
+  --water-top: #6dd8ff;
+  --water-bot: #0680ae;
+  --card-shadow: 0 10px 28px rgba(2, 80, 120, 0.10);
 }
 
 * { box-sizing: border-box; }
@@ -85,7 +85,7 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
 }
 
 .btn {
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 0.7rem 1.3rem;
   font-weight: 600;
   cursor: pointer;
@@ -109,3 +109,34 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
 .input:focus { border-color: var(--accent); }
 
 .pill { border-radius: 999px; padding: 0.2rem 0.7rem; font-size: 0.72rem; font-weight: 700; }
+
+.verify-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  color: var(--accent);
+  background:
+    radial-gradient(circle at 12% 50%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 28%),
+    color-mix(in srgb, var(--accent) 6%, var(--bg-soft));
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent),
+              0 8px 20px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.verify-link:hover { filter: brightness(1.05); }
+.verify-link code {
+  color: var(--fg-soft);
+  font-size: 0.72rem;
+}
+.verify-dot {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 16%, transparent);
+}

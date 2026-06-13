@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
-import { Button, Stat, Pill, rlusd, gbp, pct } from "../components/ui.jsx";
+import { Button, Stat, Pill, VerifyLink, rlusd, gbp, pct } from "../components/ui.jsx";
 
 export default function BorrowerDashboard() {
   const [d, setD] = useState(null);
@@ -18,7 +18,7 @@ export default function BorrowerDashboard() {
     setMsg(null);
     try {
       const r = await fn();
-      setMsg({ loanId, text: summarise(r), tone: "good" });
+      setMsg({ loanId, text: summarise(r), tone: "good", tx_hash: r.tx_hash, explorer_url: r.explorer_url });
       load();
     } catch (e) { setMsg({ loanId, text: e.message, tone: "bad" }); }
   }
@@ -62,8 +62,8 @@ export default function BorrowerDashboard() {
             <div className="mt-1 text-xs" style={{ color: "var(--fg-soft)" }}>
               pool {l.pool_key} · interest paid {rlusd(l.interest_paid)}
               {l.default_charge > 0 && <> · default charge {rlusd(l.default_charge)}</>}
-              {l.origination_tx && <> · tx {l.origination_tx.slice(0, 12)}…</>}
             </div>
+            <VerifyLink href={l.origination_explorer_url} hash={l.origination_tx} label="Verify origination on XRPL" />
             {l.status === "active" && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button variant="ghost" onClick={() => act(() => api.repay(l.id, { mode: "interest" }), l.id)}>
@@ -80,7 +80,10 @@ export default function BorrowerDashboard() {
               </div>
             )}
             {msg?.loanId === l.id && (
-              <div className="mt-2 text-sm" style={{ color: `var(--${msg.tone})` }}>{msg.text}</div>
+              <div className="mt-2 text-sm" style={{ color: `var(--${msg.tone})` }}>
+                {msg.text}
+                <VerifyLink href={msg.explorer_url} hash={msg.tx_hash} />
+              </div>
             )}
           </div>
         ))}

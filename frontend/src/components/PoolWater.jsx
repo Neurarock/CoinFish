@@ -1,12 +1,12 @@
 // The signature CoinFish visual: a tank whose water level = pool utilisation
 // (how much of the pool is lent out). Two offset wave layers wobble across the
 // surface; a fish bobs at the waterline. Used on pool cards and dashboards.
-export default function PoolWater({ level = 0.5, height = 150, label, sublabel }) {
+export default function PoolWater({ level = 0.5, height = 150, label, sublabel, playful = true }) {
   const pct = Math.max(0, Math.min(1, level));
   const waterTop = `${(1 - pct) * 100}%`;
   return (
     <div
-      className="relative w-full overflow-hidden rounded-2xl"
+      className="relative w-full overflow-hidden rounded-lg"
       style={{
         height,
         background: "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.04))",
@@ -24,7 +24,7 @@ export default function PoolWater({ level = 0.5, height = 150, label, sublabel }
         {/* two wave strips slide horizontally for the wobble */}
         <Wave className="animate-wave" opacity={0.45} top={-10} />
         <Wave className="animate-wave-slow" opacity={0.7} top={-6} />
-        <span className="animate-bob absolute right-3 top-1 text-xl select-none">🐟</span>
+        {playful && <span className="animate-bob absolute right-3 top-1 text-xl select-none">🐟</span>}
       </div>
 
       {/* gridlines for a pool-tile feel */}

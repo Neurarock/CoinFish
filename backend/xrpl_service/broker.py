@@ -53,3 +53,11 @@ def loan_broker_id_from_result(tx_result: TxResult) -> str | None:
         if created.get("LedgerEntryType") == "LoanBroker":
             return created.get("LedgerIndex")
     return None
+
+
+def cover_available(loan_broker_id: str, client: JsonRpcClient) -> float:
+    """First-loss capital (CoverAvailable) currently backing the broker's loans."""
+    from xrpl.models.requests import LedgerEntry
+
+    res = client.request(LedgerEntry(index=loan_broker_id, ledger_index="validated")).result
+    return float((res.get("node") or {}).get("CoverAvailable", "0") or 0)

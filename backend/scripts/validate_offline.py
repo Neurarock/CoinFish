@@ -16,6 +16,7 @@ from xrpl.models.transactions import (
     VaultWithdraw,
 )
 from xrpl.models.transactions.deposit_preauth import Credential
+from xrpl.models.transactions.loan_manage import LoanManageFlag
 from xrpl.models.transactions.vault_create import VaultCreateFlag, WithdrawalPolicy
 from xrpl.transaction import sign, sign_loan_set_by_counterparty
 from xrpl.utils import str_to_hex
@@ -84,15 +85,22 @@ def main() -> None:
     # --- loan flow ---
     pool = config.POOLS[1]
     q = quote_loan(pool=pool, principal=10000, credit_score=710, fiat_deposit=15000,
-                   credit_limit=12000, term_days=30, pool_drawn=20000, pool_tvl=100000)
+                   credit_limit=12000, term_hours=24, pool_drawn=20000, pool_tvl=100000)
     loan = LoanSet(
         account=operator.address, loan_broker_id=HEX64, counterparty=borrower.address,
         principal_requested=str(q.principal), interest_rate=_rate_to_ledger(q.interest_rate),
         loan_origination_fee=str(round(q.origination_fee, 6)),
-        payment_interval=30 * 86400, payment_total=1, grace_period=86400)
+        payment_interval=24 * 3600, payment_total=1, grace_period=12 * 3600)
     check("LoanSet(unsigned)", loan)
+    check("LoanSet(short/default-demo)", LoanSet(
+        account=operator.address, loan_broker_id=HEX64, counterparty=borrower.address,
+        principal_requested="5000", interest_rate=_rate_to_ledger(0.10),
+        loan_origination_fee="25", payment_interval=120, payment_total=1, grace_period=60))
     check("LoanPay", LoanPay(account=borrower.address, loan_id=HEX64, amount=amt(10500)))
-    check("LoanManage(default)", LoanManage(account=operator.address, loan_id=HEX64))
+    check("LoanManage(impair)", LoanManage(account=operator.address, loan_id=HEX64,
+          flags=LoanManageFlag.TF_LOAN_IMPAIR))
+    check("LoanManage(default)", LoanManage(account=operator.address, loan_id=HEX64,
+          flags=LoanManageFlag.TF_LOAN_DEFAULT))
 
     # --- two-party LoanSet signing, fully offline ---
     label = "LoanSet co-sign + round-trip"

@@ -44,7 +44,12 @@ ORIGINATION_FEE = 0.005        # 0.5% of principal, charged to borrower
 FIXED_SERVICE_FEE = 1.0        # flat RLUSD service fee per loan
 COVER_RATE_LIQUIDATION = 0.10  # max fraction of required cover drawn per default
 
-MAX_TERM_DAYS = 30             # protocol fixed-term loans; we cap at 30 days
+# Loans are single-payment fixed-term and capped at 24 HOURS. This bounds how
+# long lender capital can be locked: a lender queued for exit waits at most one
+# loan term (24h) for liquidity to return as loans mature. See exit_queue.py.
+MAX_TERM_HOURS = 24
+HOUR_SECONDS = 3_600
+MIN_TERM_SECONDS = 60          # XLS-66 LoanSet.MIN_PAYMENT_INTERVAL
 
 # The 3 pools CoinFish operates. cover_rate_minimum is the first-loss buffer
 # ("flexibility") — lower buffer => higher target APR.

@@ -3,3 +3,4 @@ fastapi>=0.110
 uvicorn[standard]>=0.29
 sqlmodel>=0.0.16
 python-dotenv>=1.0
+pytest>=8.0

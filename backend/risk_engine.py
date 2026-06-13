@@ -2,6 +2,9 @@
 
 Encodes: longer committed term => cheaper; higher LTV / lower credit score /
 higher pool utilisation => more expensive. Output feeds LoanSet.interest_rate.
+
+Terms are expressed in HOURS and capped at config.MAX_TERM_HOURS (24h) so lender
+capital is never locked longer than a single loan term.
 """
 from __future__ import annotations
 
@@ -14,7 +17,7 @@ from . import config
 class Quote:
     principal: float
     interest_rate: float   # annualised fraction, e.g. 0.11 == 11%
-    term_days: int
+    term_hours: int        # single fixed term, capped at config.MAX_TERM_HOURS
     origination_fee: float
     approved: bool
     reason: str = ""
@@ -39,9 +42,9 @@ def _utilisation_spread(pool_drawn: float, pool_tvl: float) -> float:
     return (pool_drawn / pool_tvl) * 0.04
 
 
-def _term_discount(term_days: int) -> float:
-    # Longer committed term => discount (max term is cheapest).
-    return term_days / config.MAX_TERM_DAYS * 0.03
+def _term_discount(term_hours: int) -> float:
+    # Longer committed term (up to the 24h cap) => discount.
+    return term_hours / config.MAX_TERM_HOURS * 0.03
 
 
 def quote_loan(
@@ -51,18 +54,18 @@ def quote_loan(
     credit_score: int,
     fiat_deposit: float,
     credit_limit: float,
-    term_days: int,
+    term_hours: int,
     pool_drawn: float = 0.0,
     pool_tvl: float = 0.0,
 ) -> Quote:
-    term_days = min(term_days, config.MAX_TERM_DAYS)
+    term_hours = max(1, min(term_hours, config.MAX_TERM_HOURS))
     origination_fee = principal * config.ORIGINATION_FEE + config.FIXED_SERVICE_FEE
 
     if principal > credit_limit:
-        return Quote(principal, 0.0, term_days, origination_fee, False,
+        return Quote(principal, 0.0, term_hours, origination_fee, False,
                      f"Requested {principal} exceeds credit limit {credit_limit}")
     if principal > fiat_deposit:
-        return Quote(principal, 0.0, term_days, origination_fee, False,
+        return Quote(principal, 0.0, term_hours, origination_fee, False,
                      "Insufficient off-chain fiat collateral")
 
     rate = (
@@ -70,7 +73,7 @@ def quote_loan(
         + _credit_spread(credit_score)
         + _ltv_spread(principal, fiat_deposit)
         + _utilisation_spread(pool_drawn, pool_tvl)
-        - _term_discount(term_days)
+        - _term_discount(term_hours)
     )
     rate = max(pool.base_apr * 0.5, round(rate, 4))
-    return Quote(principal, rate, term_days, origination_fee, True)
+    return Quote(principal, rate, term_hours, origination_fee, True)

@@ -15,6 +15,7 @@ from __future__ import annotations
 from xrpl.clients import JsonRpcClient
 from xrpl.models.requests import LedgerEntry
 from xrpl.models.transactions import LoanManage, LoanPay, LoanSet
+from xrpl.models.transactions.loan_manage import LoanManageFlag
 from xrpl.transaction import autofill_and_sign, sign_loan_set_by_counterparty
 from xrpl.wallet import Wallet
 
@@ -23,7 +24,12 @@ from .assets import rlusd_amount
 from .broker import _rate_to_ledger
 from .client import TxResult, submit, submit_signed
 
-DAY_SECONDS = 86_400
+
+def term_seconds(term_hours: int) -> int:
+    """Loan term in seconds: clamp to [MIN_TERM_SECONDS, MAX_TERM_HOURS]."""
+    secs = int(term_hours * config.HOUR_SECONDS)
+    cap = config.MAX_TERM_HOURS * config.HOUR_SECONDS
+    return max(config.MIN_TERM_SECONDS, min(secs, cap))
 
 
 def build_loan_set(
@@ -32,10 +38,20 @@ def build_loan_set(
     loan_broker_id: str,
     principal: float,
     interest_rate: float,
-    term_days: int,
+    term_hours: int,
+    *,
+    payment_interval: int | None = None,
+    grace_period: int | None = None,
 ) -> LoanSet:
-    """Construct the unsigned LoanSet (broker = Account, borrower = counterparty)."""
-    term_days = min(term_days, config.MAX_TERM_DAYS)
+    """Construct the unsigned LoanSet (broker = Account, borrower = counterparty).
+
+    `term_hours` is the single fixed term (<= 24h). `payment_interval` /
+    `grace_period` can be overridden in seconds for the default demo (a short
+    interval lets a loan go past-due fast). grace_period must be > 0 and < the
+    payment interval, else the ledger rejects the LoanSet (temINVALID).
+    """
+    interval = payment_interval if payment_interval is not None else term_seconds(term_hours)
+    grace = grace_period if grace_period is not None else max(1, interval // 2)
     origination_fee = principal * config.ORIGINATION_FEE + config.FIXED_SERVICE_FEE
     return LoanSet(
         account=operator_address,                  # loan broker owner submits + signs first
@@ -44,9 +60,9 @@ def build_loan_set(
         principal_requested=str(principal),        # numeric string in vault-asset units
         interest_rate=_rate_to_ledger(interest_rate),
         loan_origination_fee=str(round(origination_fee, 6)),
-        payment_interval=term_days * DAY_SECONDS,  # single fixed term
+        payment_interval=interval,                 # single fixed term
         payment_total=1,
-        grace_period=DAY_SECONDS,
+        grace_period=grace,
     )
 
 
@@ -56,12 +72,16 @@ def originate_loan(
     loan_broker_id: str,
     principal: float,
     interest_rate: float,
-    term_days: int,
+    term_hours: int,
     client: JsonRpcClient,
+    *,
+    payment_interval: int | None = None,
+    grace_period: int | None = None,
 ) -> TxResult:
     """Originate a loan: broker signs, borrower co-signs, submit. Funds disburse on validation."""
     tx = build_loan_set(
-        operator.address, borrower.address, loan_broker_id, principal, interest_rate, term_days
+        operator.address, borrower.address, loan_broker_id, principal, interest_rate,
+        term_hours, payment_interval=payment_interval, grace_period=grace_period,
     )
     # 1. broker signs first (autofills Sequence/Fee/LastLedgerSequence)
     broker_signed = autofill_and_sign(tx, client, operator)
@@ -135,7 +155,40 @@ def repay_full(
     return repay(borrower, loan_id, issuer_address, loan_outstanding(loan_id, client), client)
 
 
-def impair_or_default(operator: Wallet, loan_id: str, client: JsonRpcClient) -> TxResult:
-    """Broker action to impair/default a delinquent loan (drives the first-loss draw)."""
-    tx = LoanManage(account=operator.address, loan_id=loan_id)
+def impair(operator: Wallet, loan_id: str, client: JsonRpcClient) -> TxResult:
+    """Flag a delinquent loan as impaired (tfLoanImpair).
+
+    Impairing writes the expected loss down against the vault immediately and
+    brings the loan's next payment due date forward by one interval, so it can
+    be defaulted as soon as the grace period lapses.
+    """
+    tx = LoanManage(account=operator.address, loan_id=loan_id, flags=LoanManageFlag.TF_LOAN_IMPAIR)
     return submit(tx, operator, client=client)
+
+
+def default_loan(operator: Wallet, loan_id: str, client: JsonRpcClient) -> TxResult:
+    """Default a past-due loan (tfLoanDefault): draws first-loss cover, then
+    socialises any remaining loss across the vault's shares. Only valid once the
+    payment is past its due date + grace period."""
+    tx = LoanManage(account=operator.address, loan_id=loan_id, flags=LoanManageFlag.TF_LOAN_DEFAULT)
+    return submit(tx, operator, client=client)
+
+
+def unimpair(operator: Wallet, loan_id: str, client: JsonRpcClient) -> TxResult:
+    """Reverse an impairment (tfLoanUnimpair), e.g. after a late payment lands."""
+    tx = LoanManage(account=operator.address, loan_id=loan_id, flags=LoanManageFlag.TF_LOAN_UNIMPAIR)
+    return submit(tx, operator, client=client)
+
+
+def loan_status(loan_id: str, client: JsonRpcClient) -> dict:
+    """Snapshot a loan's on-chain state for display: outstanding, flags, due date."""
+    node = _loan_node(loan_id, client) or {}
+    flags = int(node.get("Flags", 0) or 0)
+    return {
+        "exists": bool(node),
+        "principal_outstanding": node.get("PrincipalOutstanding"),
+        "total_outstanding": node.get("TotalValueOutstanding"),
+        "next_payment_due": node.get("NextPaymentDueDate"),
+        "impaired": bool(flags & int(LoanManageFlag.TF_LOAN_IMPAIR)),
+        "defaulted": bool(flags & int(LoanManageFlag.TF_LOAN_DEFAULT)),
+    }

@@ -46,3 +46,4 @@ __pycache__/
 .env
 .claude
 .venv/
+.pytest_cache

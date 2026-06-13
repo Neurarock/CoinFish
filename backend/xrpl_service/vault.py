@@ -80,6 +80,27 @@ def vault_info(vault_id: str, client: JsonRpcClient) -> dict[str, Any]:
     return client.request(req).result
 
 
+def vault_node(vault_id: str, client: JsonRpcClient) -> dict[str, Any]:
+    """Read the Vault ledger object directly (reliable across rippled builds)."""
+    from xrpl.models.requests import LedgerEntry
+
+    res = client.request(LedgerEntry(index=vault_id, ledger_index="validated")).result
+    return res.get("node") or {}
+
+
+def vault_liquidity(vault_id: str, client: JsonRpcClient) -> tuple[float, float]:
+    """(available, total) RLUSD in the vault.
+
+    `available` is idle liquidity that can be withdrawn right now; the gap
+    `total - available` is capital currently lent out and only frees up as loans
+    repay or mature. The exit queue services withdrawals against `available`.
+    """
+    node = vault_node(vault_id, client)
+    total = float(node.get("AssetsTotal", "0") or 0)
+    available = float(node.get("AssetsAvailable", "0") or 0)
+    return available, total
+
+
 def vault_id_from_result(tx_result: TxResult) -> str | None:
     """Extract the created Vault ledger index from a VaultCreate result."""
     for node in tx_result.raw.get("meta", {}).get("AffectedNodes", []):

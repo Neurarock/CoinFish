@@ -14,9 +14,9 @@ def _quote(**kw):
     return quote_loan(**base)
 
 
-def test_term_is_capped_at_24h():
+def test_term_is_capped_at_max():
     q = _quote(term_hours=999)
-    assert q.term_hours == config.MAX_TERM_HOURS == 24
+    assert q.term_hours == config.MAX_TERM_HOURS == 72
 
 
 def test_term_has_a_floor():

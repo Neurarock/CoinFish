@@ -72,6 +72,7 @@ class PoolOut(BaseModel):
     risk_tier: str
     base_apr: float
     net_apr: float                 # base APR net of management fee
+    default_term_hours: int = 24   # pre-filled loan term for this pool
     first_loss_buffer: float       # cover_rate_minimum
     tvl: float
     available: float
@@ -137,6 +138,25 @@ class AcceptQuoteIn(BaseModel):
 
 class RepayIn(BaseModel):
     mode: str                      # "interest" | "full"
+
+
+class QuotesAllIn(BaseModel):
+    amount: float                  # request quotes for this amount from every pool
+
+
+class ReceiveRlusdIn(BaseModel):
+    amount: float = 0.0            # optional amount to encode in the QR (0 = open)
+
+
+class ReceiveRlusdOut(BaseModel):
+    """Instructions + QR payload to receive RLUSD into the borrower's wallet."""
+    xrpl_address: str
+    currency: str
+    issuer_address: str
+    amount: float
+    qr_payload: str                # xrpl: payment URI the frontend renders as a QR
+    explorer_url: str
+    rlusd_balance: float
 
 
 class BorrowerDashboardOut(BaseModel):

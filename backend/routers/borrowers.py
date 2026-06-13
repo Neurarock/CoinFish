@@ -24,12 +24,16 @@ from ..schemas import (
     CollateralWithdrawIn,
     QuoteIn,
     QuoteOut,
+    QuotesAllIn,
+    ReceiveRlusdIn,
+    ReceiveRlusdOut,
     RepayIn,
 )
 from ..services import (
     account_out,
     collateral_balance,
     collateral_locked,
+    explorer_account,
     explorer_object,
     explorer_tx,
     record_onchain_tx,
@@ -41,8 +45,9 @@ from ..services import (
 router = APIRouter(prefix="/borrowers", tags=["borrowers"])
 borrower_only = require_role(Role.BORROWER)
 
-# minimum term that must elapse before a full (non-interest) repayment is allowed
-MIN_TERM_FRACTION = 0.5  # must hold the loan at least half its term
+# Minimum slice of the term that interest is always charged for, even on an
+# early payoff — so lenders keep their committed yield. See config.
+MIN_TERM_FRACTION = config.MIN_TERM_FRACTION
 
 
 def _credit_limit(collateral: float) -> float:
@@ -50,21 +55,67 @@ def _credit_limit(collateral: float) -> float:
     return round(collateral * 0.80, 2)
 
 
-def _eligible_pools(session: Session, acct: Account) -> list[dict]:
+def _interest_for_hours(principal: float, rate: float, hours: float) -> float:
+    """Simple annualised interest accrued over `hours`."""
+    return round(principal * rate * hours / (365 * 24), 2)
+
+
+def _payoff(loan: Loan) -> dict:
+    """Early-payoff economics for an active loan.
+
+    Charges interest up to the *minimum term* (MIN_TERM_FRACTION of the agreed
+    term). If the borrower has already held the loan longer than that, interest
+    is charged for the elapsed time instead (capped at the full term). So an
+    early payoff never undercuts the lender's committed minimum-term yield.
+    """
+    elapsed = max(0.0, (datetime.utcnow() - loan.created_at).total_seconds() / 3600)
+    min_hold = loan.term_hours * MIN_TERM_FRACTION
+    charge_hours = min(loan.term_hours, max(min_hold, elapsed))
+    interest = _interest_for_hours(loan.principal, loan.interest_rate, charge_hours)
+    already = round(loan.interest_paid, 2)
+    interest_now = round(max(0.0, interest - already), 2)
+    return {
+        "elapsed_hours": round(elapsed, 2),
+        "min_term_hours": round(min_hold, 2),
+        "is_early": elapsed < min_hold,
+        "interest_to_min_term": interest,
+        "interest_due_now": interest_now,
+        "payoff_now": round(loan.principal + interest_now, 2),
+    }
+
+
+def _pool_eligibility(session: Session, acct: Account) -> list[dict]:
+    """Per-pool borrowing eligibility with a human-readable reason when blocked."""
     available = collateral_balance(session, acct.id) - collateral_locked(session, acct.id)
     limit = _credit_limit(available)
     outstanding = _outstanding(session, acct.id)
+    headroom = round(max(0.0, limit - outstanding), 2)
+    ltv = 0.0 if available <= 0 else round(outstanding / available, 4)
+    verified = bool(acct.credential_id or acct.kyc_status.value == "passed")
     out = []
     for key, pool in rt.pools.items():
-        headroom = round(max(0.0, limit - outstanding), 2)
-        ltv = 0.0 if available <= 0 else round(outstanding / available, 4)
-        eligible = bool(acct.credential_id or acct.kyc_status.value == "passed") and headroom > 0
+        liquidity = round(pool.available, 2)
+        reason = ""
+        if not verified:
+            reason = "Complete KYC verification to unlock borrowing."
+        elif available <= 0:
+            reason = "Add fiat collateral before you can borrow."
+        elif headroom <= 0:
+            reason = "No borrowing headroom left — repay or add collateral."
+        elif liquidity <= 0:
+            reason = "This pool is fully utilised right now — try again shortly."
+        eligible = reason == ""
         out.append({
             "key": key, "name": pool.name, "risk_tier": pool.risk_tier,
-            "base_apr": pool.base_apr, "available_liquidity": round(pool.available, 2),
-            "max_borrow": headroom, "current_ltv": ltv, "eligible": eligible,
+            "base_apr": pool.base_apr, "default_term_hours": pool.default_term_hours,
+            "available_liquidity": liquidity, "max_borrow": headroom,
+            "current_ltv": ltv, "eligible": eligible, "reason": reason,
         })
     return out
+
+
+# Backwards-compatible alias used by the dashboard payload.
+_eligible_pools = _pool_eligibility
 
 
 def _outstanding(session: Session, account_id: int) -> float:
@@ -114,7 +165,7 @@ def withdraw_collateral(body: CollateralWithdrawIn, acct: Account = Depends(borr
                         session: Session = Depends(session_dep)) -> dict:
     available = collateral_balance(session, acct.id) - collateral_locked(session, acct.id)
     if body.amount > available + 1e-6:
-        raise HTTPException(400, f"only {available} GBP is unlocked and withdrawable")
+        raise HTTPException(400, f"only ${available} is unlocked and withdrawable")
     session.add(FiatLedger(account_id=acct.id, entry_type="withdraw",
                            amount=-round(body.amount, 2), reference="collateral withdrawal"))
     session.commit()
@@ -149,6 +200,82 @@ def request_quote(body: QuoteIn, acct: Account = Depends(borrower_only),
                     interest_rate=rq.interest_rate, term_hours=rq.term_hours,
                     origination_fee=rq.origination_fee, approved=rq.approved,
                     reason=rq.reason, seconds_left=rq.seconds_left, expires_at=rq.expires_at)
+
+
+@router.post("/quotes")
+def request_all_quotes(body: QuotesAllIn, acct: Account = Depends(borrower_only),
+                       session: Session = Depends(session_dep)) -> dict:
+    """Quote `amount` against EVERY pool at once so the borrower can shop around.
+
+    Each pool uses its own default term, so rates differ and the comparison is
+    meaningful. Eligible pools return a live (5s) quote; ineligible pools return
+    a reason and no quote (the UI shows a polite "thank you" card instead).
+    """
+    elig = {e["key"]: e for e in _pool_eligibility(session, acct)}
+    available = collateral_balance(session, acct.id) - collateral_locked(session, acct.id)
+    limit = _credit_limit(available)
+    rows: list[dict] = []
+    for key, pool in rt.pools.items():
+        e = elig[key]
+        row = {
+            "pool_key": key, "name": pool.name, "risk_tier": pool.risk_tier,
+            "base_apr": pool.base_apr, "default_term_hours": pool.default_term_hours,
+            "available_liquidity": round(pool.available, 2),
+            "max_borrow": e["max_borrow"], "eligible": e["eligible"],
+            "reason": e["reason"], "quote": None,
+        }
+        if e["eligible"]:
+            q = risk_engine.quote_loan(
+                pool=config.PoolConfig(pool.key, pool.name, pool.risk_tier,
+                                       pool.cover_rate_minimum, pool.base_apr,
+                                       pool.default_term_hours),
+                principal=body.amount,
+                credit_score=acct.credit_score or 680,
+                fiat_deposit=available,
+                credit_limit=limit,
+                term_hours=pool.default_term_hours,
+                pool_drawn=pool.drawn,
+                pool_tvl=pool.tvl,
+            )
+            if q.approved:
+                rq = rt.new_quote(account_id=acct.id, pool_key=pool.key, principal=q.principal,
+                                  interest_rate=q.interest_rate, term_hours=q.term_hours,
+                                  origination_fee=q.origination_fee, approved=True, reason="")
+                row["quote"] = {
+                    "id": rq.id, "principal": rq.principal, "interest_rate": rq.interest_rate,
+                    "term_hours": rq.term_hours, "origination_fee": rq.origination_fee,
+                    "total_interest": _interest_for_hours(rq.principal, rq.interest_rate, rq.term_hours),
+                    "seconds_left": rq.seconds_left, "expires_at": rq.expires_at,
+                }
+            else:
+                row["eligible"] = False
+                row["reason"] = q.reason
+        rows.append(row)
+    return {"amount": round(body.amount, 2), "quotes": rows}
+
+
+@router.post("/wallet/receive", response_model=ReceiveRlusdOut)
+def receive_rlusd(body: ReceiveRlusdIn, acct: Account = Depends(borrower_only)) -> ReceiveRlusdOut:
+    """Return the borrower's wallet address + a QR payload to receive RLUSD.
+
+    Mirrors the fiat top-up QR flow, but for the on-chain side: scanning funds
+    the connected wallet with RLUSD so the borrower can repay or pay interest.
+    """
+    if not acct.xrpl_address:
+        raise HTTPException(400, "connect a wallet first")
+    amt = max(0.0, round(body.amount, 2))
+    issuer = rt.issuer_address or ""
+    qr = (f"xrpl://{acct.xrpl_address}?currency={config.STABLECOIN_CODE}"
+          f"&issuer={issuer}" + (f"&amount={amt:.2f}" if amt > 0 else ""))
+    return ReceiveRlusdOut(
+        xrpl_address=acct.xrpl_address,
+        currency=config.STABLECOIN_CODE,
+        issuer_address=issuer,
+        amount=amt,
+        qr_payload=qr,
+        explorer_url=explorer_account(acct.xrpl_address),
+        rlusd_balance=round(acct.wallet_rlusd_balance or 0.0, 2),
+    )
 
 
 @router.post("/loans/accept")
@@ -264,15 +391,13 @@ def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
                 "wallet_balance": acct.wallet_rlusd_balance}
 
     if body.mode == "full":
-        elapsed = (datetime.utcnow() - loan.created_at).total_seconds() / 3600
-        min_hold = loan.term_hours * MIN_TERM_FRACTION
-        if elapsed < min_hold:
-            raise HTTPException(
-                400,
-                f"Minimum term not met: this loan must be held at least "
-                f"{min_hold:.1f}h before full repayment (held {elapsed:.1f}h). "
-                f"Pay interest only, or wait.")
-        repay_total = round(loan.principal + interest_due, 2)
+        # Early payoff is allowed at any time. Interest is still charged up to
+        # the minimum term (MIN_TERM_FRACTION of the agreed term) so the lender
+        # keeps the yield they committed capital for. _payoff nets off any
+        # interest already paid on this loan.
+        payoff = _payoff(loan)
+        early_interest = payoff["interest_due_now"]
+        repay_total = payoff["payoff_now"]
         if not loan.xrpl_loan_id:
             raise HTTPException(400, "loan has no XRPL loan id; cannot repay on-chain")
         from ..xrpl_service import assets
@@ -299,17 +424,19 @@ def repay(loan_id: int, body: RepayIn, acct: Account = Depends(borrower_only),
             amount=repay_total,
         )
         acct.wallet_rlusd_balance = assets.rlusd_balance(acct.xrpl_address, rt.issuer_address, client)
-        loan.interest_paid += interest_due
+        loan.interest_paid += early_interest
         loan.status = LoanStatus.REPAID
         rt.pools[loan.pool_key].drawn = max(0.0, rt.pools[loan.pool_key].drawn - loan.principal)
-        rt.fees_collected += round(interest_due * config.MANAGEMENT_FEE, 2)
+        rt.fees_collected += round(early_interest * config.MANAGEMENT_FEE, 2)
         # release locked collateral
         session.add(FiatLedger(account_id=acct.id, entry_type="release",
                                amount=loan.principal, reference=f"loan {loan.id} repaid"))
         session.add(loan)
         session.commit()
         return {"ok": True, "mode": "full", "interest_paid": loan.interest_paid,
-                "principal_repaid": loan.principal, "status": "repaid",
+                "interest_charged": early_interest, "principal_repaid": loan.principal,
+                "payoff_total": repay_total, "early": payoff["is_early"],
+                "min_term_hours": payoff["min_term_hours"], "status": "repaid",
                 "tx_hash": tx_hash, "explorer_url": explorer_tx(tx_hash),
                 "wallet_balance": acct.wallet_rlusd_balance}
 
@@ -387,6 +514,7 @@ def dashboard(acct: Account = Depends(borrower_only),
         "origination_tx": l.origination_tx,
         "origination_explorer_url": explorer_tx(l.origination_tx),
         "due_at": l.due_at.isoformat() if l.due_at else None,
+        **({"payoff": _payoff(l)} if l.status == LoanStatus.ACTIVE else {"payoff": None}),
     } for l in loans]
     bill = {
         "interest_paid": round(interest_paid, 2),

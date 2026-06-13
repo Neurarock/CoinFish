@@ -33,6 +33,7 @@ class PoolRuntime:
     risk_tier: str
     cover_rate_minimum: float
     base_apr: float
+    default_term_hours: int = 24
     vault_id: str = ""
     loan_broker_id: str = ""
     # demo-mode mirror of on-chain liquidity so dashboards have live numbers
@@ -81,7 +82,8 @@ class Runtime:
         self.issuer_seed: str = config.ISSUER_SEED
         self.issuer_address: str = os.getenv("COINFISH_ISSUER_ADDRESS", "")
         self.pools: dict[str, PoolRuntime] = {
-            p.key: PoolRuntime(p.key, p.name, p.risk_tier, p.cover_rate_minimum, p.base_apr)
+            p.key: PoolRuntime(p.key, p.name, p.risk_tier, p.cover_rate_minimum,
+                               p.base_apr, p.default_term_hours)
             for p in config.POOLS
         }
         self.quotes: dict[str, Quote] = {}

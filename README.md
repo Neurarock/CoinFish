@@ -33,7 +33,7 @@ backend/
     run_demo.py          full A->G live lifecycle (incl. default path)
     run_exit_demo.py     live bank-run: exit queue under liquidity stress
   tests/               pytest unit tests (exit queue, risk engine)
-frontend/              React dashboard (WIP)
+frontend/              React dashboard (lender / borrower / vault, themed)
 reference/             starter scripts kept for porting (JS credentials/domains, python)
 SPEC.md                full spec
 ```
@@ -104,4 +104,11 @@ Backend chain service layer complete and verified **live on Devnet** (M0–M5):
 RLUSD issuance, permissioned-domain + credential onboarding, vault/broker pools
 with first-loss capital, co-signed instant loans, full repayment, the
 default/first-loss path, and the lender exit queue all run end to end. Offline:
-`pytest` + `validate_offline` are green. React dashboard (M6) is next — see SPEC.md §10.
+`pytest` + `validate_offline` are green.
+
+The **React dashboard (M6) is built**: three themed worlds — Lender (bright,
+purple accent), Borrower (crisp black), and the CoinFish Vault operator console
+(pink) — sharing the signature water-tank pool visual, an on-chain processing
+overlay for every wallet/loan action, live XRPL Explorer verify links, an
+animated Devnet badge, and a multi-quote borrow flow that shops every eligible
+pool at once. See `docs/FRONTEND_PLAN.md`.

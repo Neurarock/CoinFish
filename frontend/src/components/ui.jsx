@@ -47,8 +47,10 @@ export function Pill({ children, tone = "accent" }) {
   return <span className="pill" style={{ background: bg, color: fg }}>{children}</span>;
 }
 
-export const gbp = (n) =>
-  "£" + Number(n || 0).toLocaleString("en-GB", { maximumFractionDigits: 2 });
+export const usd = (n) =>
+  "$" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+// Back-compat alias: collateral used to be GBP, now displayed in USD.
+export const gbp = usd;
 export const rlusd = (n) =>
   Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 }) + " RLUSD";
 export const pct = (n) => (Number(n || 0) * 100).toFixed(1) + "%";

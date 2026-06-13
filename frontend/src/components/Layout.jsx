@@ -4,7 +4,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../store.jsx";
 import { api } from "../api.js";
-import { Pill } from "./ui.jsx";
+import DevnetBadge from "./DevnetBadge.jsx";
+import Footer from "./Footer.jsx";
 
 const THEME = { lender: "theme-lender", borrower: "theme-borrower", admin: "theme-vault" };
 const TITLE = { lender: "CoinFish · Lend", borrower: "CoinFish · Borrow", admin: "CoinFish · Vault" };
@@ -59,16 +60,13 @@ export default function Layout({ role, children }) {
               Sign out
             </button>
           )}
-          {status && (
-            <span className="ml-2 hidden sm:inline-flex" title={status.warnings?.join("\n") || status.mode}>
-              <Pill tone={status.live_chain ? (status.devnet_ready ? "good" : "warn") : "muted"}>
-                {status.devnet_ready ? "XRPL Devnet" : "Devnet setup"}
-              </Pill>
-            </span>
-          )}
+          <span className="ml-2 hidden sm:inline-flex">
+            <DevnetBadge status={status} />
+          </span>
         </nav>
       </header>
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <Footer />
     </div>
   );
 }

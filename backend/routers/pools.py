@@ -20,6 +20,7 @@ def pool_out(key: str) -> PoolOut:
         risk_tier=p.risk_tier,
         base_apr=p.base_apr,
         net_apr=net_apr,
+        default_term_hours=p.default_term_hours,
         first_loss_buffer=p.cover_rate_minimum,
         tvl=round(p.tvl, 2),
         available=round(p.available, 2),

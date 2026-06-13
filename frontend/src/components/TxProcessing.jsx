@@ -8,6 +8,7 @@
 // `track` resolves with the API result (and shows a success state + explorer
 // link), or rejects (and shows the error) — callers handle the value as normal.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import swim from "../swim.gif";
 
 const TxCtx = createContext(null);
 export const useTx = () => useContext(TxCtx);
@@ -26,7 +27,7 @@ export function TxProvider({ children }) {
 
   const track = useCallback(async (promise, opts = {}) => {
     const steps = opts.steps?.length ? opts.steps : DEFAULT_STEPS;
-    const stepMs = opts.stepMs || 780;
+    const stepMs = opts.stepMs || 1150;
     // Inherit whatever role theme is currently mounted so the overlay's accent
     // colours match the page the user is on (purple / cyan / pink).
     const themed = typeof document !== "undefined"
@@ -36,9 +37,11 @@ export function TxProvider({ children }) {
     setSt({ title: opts.title || "Submitting to XRPL", steps, idx: 0, status: "running",
             theme, message: "", explorerUrl: "", successLabel: opts.success || "Confirmed on XRPL Devnet" });
 
-    // Walk the steps, pausing on the final one until the promise settles.
+    // Dwell on the early steps and hold on the second-to-last one until the
+    // promise settles — so the final step only completes when the tx actually
+    // confirms, instead of sitting "stuck" on the last step.
     const iv = setInterval(() => {
-      setSt((s) => (s && s.status === "running" && s.idx < s.steps.length - 1
+      setSt((s) => (s && s.status === "running" && s.idx < s.steps.length - 2
         ? { ...s, idx: s.idx + 1 } : s));
     }, stepMs);
     timers.current.push(iv);
@@ -75,7 +78,7 @@ function Overlay({ st, onClose }) {
     <div className={`tx-scrim ${theme || ""}`} onClick={status !== "running" ? onClose : undefined}>
       <div className="tx-card morph-edge" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-4">
-          {status === "running" && <div className="tx-ring" />}
+          {status === "running" && <img src={swim} alt="" className="tx-swim" />}
           {status === "success" && <ResultMark tone="good">✓</ResultMark>}
           {status === "error" && <ResultMark tone="bad">!</ResultMark>}
           <div>

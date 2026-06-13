@@ -90,7 +90,7 @@ export default function Landing() {
   }
 
   return (
-    <div className={`app-bg ${THEME[role]} min-h-screen flex flex-col`}>
+    <div className={`home-page app-bg ${THEME[role]} min-h-screen flex flex-col`}>
       <div className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3 text-xl font-extrabold">
           <Logo size={68} to="/" /> CoinFish

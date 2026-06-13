@@ -1,16 +1,19 @@
-// CoinFish's operator dashboard. Shows fee revenue, solvency, risk, pool
-// saturation, and loans inside the grace window with a control to extend grace.
+// CoinFish Vault — operator console, styled after the XRPL Devnet explorer
+// (devnet.xrpl.org): a clean dark ledger view, hairline-divided data tables,
+// boxy corners, monospace figures. Shows fee revenue, solvency, risk, pool
+// utilisation, the at-risk loan queue with a grace control, and the live XRPL
+// transaction feed.
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
-import PoolWater from "../components/PoolWater.jsx";
 import TxLedger from "../components/TxLedger.jsx";
-import { Button, Stat, Pill, rlusd, pct } from "../components/ui.jsx";
+import { Button, Pill, rlusd, pct } from "../components/ui.jsx";
 
 export default function VaultDashboard() {
   const [d, setD] = useState(null);
   const [hours, setHours] = useState({});
   const [txs, setTxs] = useState([]);
+  const [tick, setTick] = useState(0);
 
   const load = () => {
     api.adminDashboard().then(setD);
@@ -18,7 +21,7 @@ export default function VaultDashboard() {
   };
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000);
+    const t = setInterval(() => { load(); setTick((n) => n + 1); }, 5000);
     return () => clearInterval(t);
   }, []);
 
@@ -27,142 +30,149 @@ export default function VaultDashboard() {
     load();
   }
 
-  if (!d) return <Layout role="admin"><div>Loading…</div></Layout>;
+  if (!d) return <Layout role="admin"><div className="px-1 py-10" style={{ color: "var(--fg-soft)" }}>Loading ledger…</div></Layout>;
 
   return (
     <Layout role="admin">
-      <div className="vault-aurora" />
-      {d.underwater && <Underwater />}
-      <div className="relative z-10">
-        <div className="vault-hero flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="vault-kicker">CoinFish command layer</div>
-            <h1 className="text-3xl font-extrabold"><span className="morph-text">Vault operations</span></h1>
-            <p className="mt-1 max-w-2xl text-sm" style={{ color: "var(--fg-soft)" }}>
-              Devnet treasury control, pool liquidity, protocol fees, and borrower risk signals.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Pill tone={d.underwater ? "bad" : "good"}>
-              {d.underwater ? "underwater" : "solvent"} · {d.solvency_ratio}×
-            </Pill>
-          </div>
+      {/* explorer-style title bar */}
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b pb-3"
+        style={{ borderColor: "var(--line)" }}>
+        <div>
+          <div className="vault-kicker">CoinFish · command layer</div>
+          <h1 className="text-2xl font-extrabold"><span className="morph-text">Vault explorer</span></h1>
         </div>
-
-        <div className="mt-5 grid gap-4 sm:grid-cols-4">
-          <Stat label="Fees collected" value={rlusd(d.fees_collected)} accent />
-          <Stat label="Total TVL" value={rlusd(d.total_tvl)} />
-          <Stat label="Out on loan" value={rlusd(d.total_drawn)} />
-          <Stat label="First-loss capital" value={rlusd(d.total_first_loss)} />
+        <div className="flex items-center gap-3 text-xs" style={{ color: "var(--fg-soft)" }}>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="devnet-orb" style={{ width: ".5rem", height: ".5rem", background: "var(--accent)" }} />
+            live · refreshes every 5s
+          </span>
+          <Pill tone={d.underwater ? "bad" : "good"}>
+            {d.underwater ? "underwater" : "solvent"} · {d.solvency_ratio}×
+          </Pill>
         </div>
-
-        <div className="mt-6 grid gap-5 md:grid-cols-3">
-          <div className="control-panel p-5 md:col-span-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--fg-soft)" }}>
-                  Composite risk
-                </div>
-                <div className="font-bold">Vault exposure score</div>
-              </div>
-              <Pill tone={d.risk_band === "low" ? "good" : d.risk_band === "critical" ? "bad" : "warn"}>
-                {d.risk_band}
-              </Pill>
-            </div>
-            <RiskGauge score={d.risk_score} band={d.risk_band} />
-          </div>
-          <div className="md:col-span-2 grid gap-5 sm:grid-cols-3">
-            {d.pools.map((p) => (
-              <div key={p.key} className="control-panel p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-bold text-sm">{p.name}</div>
-                  <Pill tone={p.utilisation > 0.85 ? "bad" : p.utilisation > 0.6 ? "warn" : "good"}>
-                    {pct(p.utilisation)}
-                  </Pill>
-                </div>
-                <div className="my-2">
-                  <PoolWater level={p.utilisation} height={110} label="utilised" playful={false} />
-                </div>
-                <div className="text-xs" style={{ color: "var(--fg-soft)" }}>
-                  TVL {rlusd(p.tvl)} · cover {pct(p.first_loss_buffer)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* critical section */}
-        <h2 className="mt-8 mb-3 text-xl font-bold">
-          Critical loans
-          {d.at_risk_loans.length > 0 && <span className="ml-2"><Pill tone="bad">{d.at_risk_loans.length}</Pill></span>}
-        </h2>
-        {d.at_risk_loans.length === 0 ? (
-          <div className="control-panel p-5" style={{ color: "var(--fg-soft)" }}>
-            No active loans are inside the grace/default window.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {d.at_risk_loans.map((l) => (
-              <div key={l.loan_id} className="control-panel p-4"
-                style={{ borderColor: l.in_grace ? "var(--bad)" : "var(--warn)" }}>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="font-bold">
-                    Loan #{l.loan_id} · {rlusd(l.principal)} · pool {l.pool_key}
-                  </div>
-                  <Pill tone={l.in_grace ? "bad" : "warn"}>
-                    {l.in_grace ? `in grace · ${Math.abs(l.hours_to_default).toFixed(1)}h over` : `${l.hours_to_default.toFixed(1)}h to default`}
-                  </Pill>
-                </div>
-                <div className="mt-3 flex items-end gap-2">
-                  <label>
-                    <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Extend grace (hours)</span>
-                    <input className="input mt-1 w-28" type="number" min="1"
-                      value={hours[l.loan_id] || 1}
-                      onChange={(e) => setHours({ ...hours, [l.loan_id]: e.target.value })} />
-                  </label>
-                  <Button onClick={() => extend(l.loan_id)}>Grant extension</Button>
-                  {l.grace_extra_hours > 0 && (
-                    <span className="text-xs self-center" style={{ color: "var(--fg-soft)" }}>
-                      +{l.grace_extra_hours}h already granted
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <TxLedger rows={txs} title="XRPL transaction ledger" />
       </div>
+
+      {/* metrics strip — explorer header cells */}
+      <div className="exp-panel mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <Metric label="Fees collected" value={rlusd(d.fees_collected)} accent divider />
+        <Metric label="Total TVL" value={rlusd(d.total_tvl)} divider />
+        <Metric label="Out on loan" value={rlusd(d.total_drawn)} divider />
+        <Metric label="First-loss" value={rlusd(d.total_first_loss)} divider />
+        <Metric label="Solvency" value={`${d.solvency_ratio}×`} divider />
+        <Metric label={`Risk · ${d.risk_band}`} value={Math.round(d.risk_score)}
+          tone={d.risk_band === "low" ? "good" : d.risk_band === "critical" ? "bad" : "warn"} />
+      </div>
+
+      {/* risk meter */}
+      <div className="exp-panel mt-4 p-4">
+        <div className="exp-head mb-2">Composite vault exposure</div>
+        <RiskMeter score={d.risk_score} band={d.risk_band} />
+      </div>
+
+      {/* pools table */}
+      <SectionTitle>Pools</SectionTitle>
+      <div className="exp-panel">
+        <div className="exp-row exp-head" style={{ gridTemplateColumns: "1.4fr .7fr 1.6fr 1fr .8fr" }}>
+          <div>Pool</div><div>Risk</div><div>Utilisation</div><div className="text-right">TVL</div><div className="text-right">Cover</div>
+        </div>
+        {d.pools.map((p) => (
+          <div key={p.key} className="exp-row" style={{ gridTemplateColumns: "1.4fr .7fr 1.6fr 1fr .8fr" }}>
+            <div className="font-bold">{p.name}</div>
+            <div><Pill tone={p.utilisation > 0.85 ? "bad" : p.utilisation > 0.6 ? "warn" : "good"}>{p.risk_tier ?? p.key}</Pill></div>
+            <div className="flex items-center gap-2">
+              <UtilBar v={p.utilisation} />
+              <span className="mono text-xs" style={{ color: "var(--fg-soft)" }}>{pct(p.utilisation)}</span>
+            </div>
+            <div className="mono text-right">{rlusd(p.tvl)}</div>
+            <div className="mono text-right" style={{ color: "var(--fg-soft)" }}>{pct(p.first_loss_buffer)}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* critical loans */}
+      <SectionTitle>
+        Critical loans
+        {d.at_risk_loans.length > 0 && <span className="ml-2"><Pill tone="bad">{d.at_risk_loans.length}</Pill></span>}
+      </SectionTitle>
+      {d.at_risk_loans.length === 0 ? (
+        <div className="exp-panel p-4 text-sm" style={{ color: "var(--fg-soft)" }}>
+          No active loans are inside the grace / default window.
+        </div>
+      ) : (
+        <div className="exp-panel">
+          <div className="exp-row exp-head" style={{ gridTemplateColumns: "2fr 1.2fr 1.4fr 1.6fr" }}>
+            <div>Loan</div><div className="text-right">Principal</div><div>Window</div><div>Grace control</div>
+          </div>
+          {d.at_risk_loans.map((l) => (
+            <div key={l.loan_id} className="exp-row" style={{ gridTemplateColumns: "2fr 1.2fr 1.4fr 1.6fr" }}>
+              <div className="mono">#{l.loan_id} · pool {l.pool_key}</div>
+              <div className="mono text-right">{rlusd(l.principal)}</div>
+              <div>
+                <Pill tone={l.in_grace ? "bad" : "warn"}>
+                  {l.in_grace ? `grace · ${Math.abs(l.hours_to_default).toFixed(1)}h over` : `${l.hours_to_default.toFixed(1)}h to default`}
+                </Pill>
+                {l.grace_extra_hours > 0 && (
+                  <span className="ml-2 text-[11px]" style={{ color: "var(--fg-soft)" }}>+{l.grace_extra_hours}h granted</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input className="input mono w-20 py-1" type="number" min="1"
+                  value={hours[l.loan_id] || 1}
+                  onChange={(e) => setHours({ ...hours, [l.loan_id]: e.target.value })} />
+                <Button className="py-1.5" onClick={() => extend(l.loan_id)}>Extend</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <SectionTitle>XRPL transaction ledger</SectionTitle>
+      <TxLedger rows={txs} title="" />
     </Layout>
   );
 }
 
-function RiskGauge({ score, band }) {
-  const tone = band === "low" ? "good" : band === "critical" ? "bad" : "warn";
-  const r = 54, c = Math.PI * r; // half circle
-  const frac = score / 100;
+function SectionTitle({ children }) {
+  return <h2 className="mt-7 mb-2 text-sm font-extrabold uppercase tracking-wider"
+    style={{ color: "var(--fg-soft)" }}>{children}</h2>;
+}
+
+function Metric({ label, value, accent, tone, divider }) {
   return (
-    <div className="mt-3 flex flex-col items-center">
-      <svg width="150" height="90" viewBox="0 0 150 90">
-        <path d="M15 80 A60 60 0 0 1 135 80" fill="none" stroke="var(--line)" strokeWidth="12" strokeLinecap="round" />
-        <path d="M15 80 A60 60 0 0 1 135 80" fill="none" stroke={`var(--${tone})`} strokeWidth="12"
-          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - frac)} />
-      </svg>
-      <div className="-mt-4 text-3xl font-extrabold" style={{ color: `var(--${tone})` }}>{score}</div>
-      <Pill tone={tone}>{band}</Pill>
+    <div className="p-4" style={{ borderRight: divider ? "1px solid var(--line)" : "none" }}>
+      <div className="exp-head">{label}</div>
+      <div className="mono mt-1 text-xl font-extrabold"
+        style={{ color: tone ? `var(--${tone})` : accent ? "var(--accent)" : "var(--fg)" }}>
+        {value}
+      </div>
     </div>
   );
 }
 
-// Subtle full-page liquidity pressure overlay when the platform is underwater.
-function Underwater() {
+function UtilBar({ v }) {
+  const pctv = Math.max(0, Math.min(1, v)) * 100;
+  const tone = v > 0.85 ? "bad" : v > 0.6 ? "warn" : "good";
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-70">
-      <div className="absolute inset-x-0 bottom-0 h-2/3"
-        style={{
-          background: "linear-gradient(180deg, rgba(219,39,119,0.05), rgba(219,39,119,0.24))",
-          borderTop: "1px solid rgba(236,72,153,0.40)",
-        }} />
+    <div className="h-2 flex-1" style={{ background: "color-mix(in srgb, var(--line) 60%, transparent)" }}>
+      <div className="h-full" style={{ width: `${pctv}%`, background: `var(--${tone})`, transition: "width .6s ease" }} />
+    </div>
+  );
+}
+
+function RiskMeter({ score, band }) {
+  const tone = band === "low" ? "good" : band === "critical" ? "bad" : "warn";
+  const pctv = Math.max(0, Math.min(100, score));
+  return (
+    <div>
+      <div className="relative h-3" style={{ background: "color-mix(in srgb, var(--line) 60%, transparent)" }}>
+        <div className="h-full" style={{ width: `${pctv}%`, background: `var(--${tone})`, transition: "width .6s ease" }} />
+        <div className="absolute top-0 bottom-0" style={{ left: `${pctv}%`, width: 2, background: "var(--fg)" }} />
+      </div>
+      <div className="mt-2 flex items-center justify-between text-xs" style={{ color: "var(--fg-soft)" }}>
+        <span className="mono">0</span>
+        <span className="mono text-base font-extrabold" style={{ color: `var(--${tone})` }}>{Math.round(score)} / 100 · {band}</span>
+        <span className="mono">100</span>
+      </div>
     </div>
   );
 }

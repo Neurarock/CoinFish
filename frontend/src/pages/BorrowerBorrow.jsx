@@ -6,23 +6,27 @@
 // Eligible pools show a live (5s) quote with a countdown ring + Accept button.
 // Ineligible pools show the reason and a friendly "thank you" card instead.
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import { useTx } from "../components/TxProcessing.jsx";
-import { Button, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
+import { Button, Pill, VerifyLink, rlusd, usd, pct } from "../components/ui.jsx";
 
 const QUOTE_WINDOW = 5; // seconds a quote stays live
 
 export default function BorrowerBorrow() {
   const [amount, setAmount] = useState(20000);
   const [data, setData] = useState(null);   // { amount, quotes: [...] }
+  const [info, setInfo] = useState(null);    // borrower onboarding snapshot
   const [now, setNow] = useState(Date.now() / 1000);
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
   const timer = useRef(null);
   const nav = useNavigate();
   const { track } = useTx();
+
+  const loadInfo = () => api.borrowerDashboard().then(setInfo).catch(() => setInfo(null));
+  useEffect(() => { loadInfo(); }, []);
 
   // a single ticking clock drives every card's countdown
   useEffect(() => {
@@ -76,6 +80,8 @@ export default function BorrowerBorrow() {
         so it pays to shop around. Quotes are live for {QUOTE_WINDOW} seconds.
       </p>
 
+      {info && <Readiness info={info} />}
+
       <div className="card p-5">
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex-1">
@@ -88,6 +94,20 @@ export default function BorrowerBorrow() {
           </Button>
         </div>
       </div>
+
+      {data && eligible.length === 0 && (
+        <div className="card mt-6 p-5" style={{ borderColor: "var(--warn)" }}>
+          <div className="font-bold" style={{ color: "var(--warn)" }}>No pool is available for you yet</div>
+          <div className="mt-1 text-sm" style={{ color: "var(--fg-soft)" }}>
+            {blocked[0]?.reason || "You don’t currently qualify for any pool."} Once that’s sorted,
+            re-quote and your offers will appear here.
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Link to="/borrower/collateral"><Button>Add collateral</Button></Link>
+            <Button variant="ghost" onClick={getQuotes}>Re-quote</Button>
+          </div>
+        </div>
+      )}
 
       {eligible.length > 0 && (
         <>
@@ -128,6 +148,31 @@ export default function BorrowerBorrow() {
 function leftFor(quote, now) {
   if (!quote?.expires_at) return 0;
   return Math.max(0, quote.expires_at - now);
+}
+
+// Onboarding readiness strip — borrowing needs KYC + available collateral, so
+// surface that up-front rather than letting the borrower wonder why no pool appears.
+function Readiness({ info }) {
+  const kyc = info.account?.kyc_status === "passed";
+  const coll = (info.collateral_available || 0) > 0;
+  const ready = kyc && coll;
+  return (
+    <div className="card mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 p-3 text-sm">
+      <span className="inline-flex items-center gap-2">
+        <Pill tone={kyc ? "good" : "warn"}>{kyc ? "KYC passed" : "KYC needed"}</Pill>
+      </span>
+      <span className="inline-flex items-center gap-2">
+        <Pill tone={coll ? "good" : "warn"}>collateral</Pill>
+        <span className="mono" style={{ color: "var(--fg-soft)" }}>{usd(info.collateral_available)} available</span>
+      </span>
+      {!ready && (
+        <Link to="/borrower/collateral" className="ml-auto font-semibold" style={{ color: "var(--accent)" }}>
+          {coll ? "Manage collateral" : "Add collateral"} →
+        </Link>
+      )}
+      {ready && <span className="ml-auto text-xs" style={{ color: "var(--good)" }}>Ready to borrow</span>}
+    </div>
+  );
 }
 
 function QuoteCard({ p, left, onAccept }) {

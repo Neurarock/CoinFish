@@ -16,12 +16,42 @@ import os
 from typing import Optional
 
 from sqlalchemy import text
+from sqlalchemy.pool import NullPool
 from sqlmodel import Field, Session, SQLModel, create_engine
 
-# A single file next to the backend package. Override with COINFISH_DB_URL.
 
-DB_URL = os.getenv("COINFISH_DB_URL", "sqlite:///./coinfish.db")
-engine = create_engine(DB_URL, echo=False, connect_args={"check_same_thread": False})
+def _resolve_db_url() -> str:
+    """Pick the database URL, preferring a managed Postgres if one is provided.
+
+    Serverless platforms (Vercel) hand a connection string via one of several env
+    vars. We accept any of them so the deployed app uses a *persistent* database
+    instead of an ephemeral per-instance SQLite file (which silently loses every
+    account/loan between requests). Locally, with none set, we fall back to a
+    SQLite file next to the backend package.
+    """
+    url = (
+        os.getenv("COINFISH_DB_URL")
+        or os.getenv("DATABASE_URL")
+        or os.getenv("POSTGRES_URL_NON_POOLING")
+        or os.getenv("POSTGRES_URL")
+        or "sqlite:///./coinfish.db"
+    )
+    # Normalise Postgres scheme variants onto the psycopg (v3) driver.
+    if url.startswith("postgres://"):
+        url = "postgresql+psycopg://" + url[len("postgres://"):]
+    elif url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
+DB_URL = _resolve_db_url()
+
+if DB_URL.startswith("sqlite"):
+    engine = create_engine(DB_URL, echo=False, connect_args={"check_same_thread": False})
+else:
+    # Serverless-friendly: don't keep pooled connections alive between
+    # invocations, and validate a connection before using it.
+    engine = create_engine(DB_URL, echo=False, pool_pre_ping=True, poolclass=NullPool)
 
 
 # --- enums -------------------------------------------------------------------

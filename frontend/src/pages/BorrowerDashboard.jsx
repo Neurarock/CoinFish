@@ -14,10 +14,12 @@ export default function BorrowerDashboard() {
   const [d, setD] = useState(null);
   const [msg, setMsg] = useState(null);
   const [txs, setTxs] = useState([]);
+  const [loadErr, setLoadErr] = useState("");
   const { track } = useTx();
 
   const load = () => {
-    api.borrowerDashboard().then(setD);
+    setLoadErr("");
+    api.borrowerDashboard().then(setD).catch((e) => setLoadErr(e.message || "Could not load your dashboard."));
     api.myTransactions().then(setTxs).catch(() => setTxs([]));
   };
   useEffect(() => { load(); }, []);
@@ -31,7 +33,22 @@ export default function BorrowerDashboard() {
     } catch (e) { setMsg({ loanId, text: e.message, tone: "bad" }); }
   }
 
-  if (!d) return <Layout role="borrower"><div>Loading…</div></Layout>;
+  if (!d) return (
+    <Layout role="borrower">
+      {loadErr ? (
+        <div className="card p-5">
+          <div className="font-bold" style={{ color: "var(--bad)" }}>Couldn’t load your dashboard</div>
+          <div className="mt-1 text-sm" style={{ color: "var(--fg-soft)" }}>
+            {loadErr} If this is the deployed app, the backend likely isn’t keeping state — see the
+            database setup notes.
+          </div>
+          <Button className="mt-3" onClick={load}>Retry</Button>
+        </div>
+      ) : (
+        <div style={{ color: "var(--fg-soft)" }}>Loading…</div>
+      )}
+    </Layout>
+  );
 
   return (
     <Layout role="borrower">

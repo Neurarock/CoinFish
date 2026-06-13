@@ -47,3 +47,11 @@ __pycache__/
 .claude
 .venv/
 .pytest_cache
+
+# CoinFish runtime / demo state
+*.db
+coinfish.db
+setup.json
+/frontend/node_modules
+/frontend/dist
+/frontend/vite.config.js.timestamp-*.mjs

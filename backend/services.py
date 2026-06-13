@@ -67,12 +67,20 @@ def require_role(role: Role):
 
 
 # --- fiat ledger -------------------------------------------------------------
+# Entries that move actual fiat in/out of CoinFish custody. `lock`/`release` are
+# informational only (they ring-fence collateral behind a live loan) and must NOT
+# move the custody balance, or collateral would be double-counted.
+_CUSTODY_TYPES = {"deposit", "withdraw", "default_charge", "recover"}
+
+
 def collateral_balance(session: Session, account_id: int) -> float:
+    """Total fiat CoinFish holds in custody for this borrower."""
     rows = session.exec(select(FiatLedger).where(FiatLedger.account_id == account_id)).all()
-    return round(sum(r.amount for r in rows), 2)
+    return round(sum(r.amount for r in rows if r.entry_type in _CUSTODY_TYPES), 2)
 
 
 def collateral_locked(session: Session, account_id: int) -> float:
+    """Collateral ring-fenced behind live loans (lock minus release)."""
     rows = session.exec(select(FiatLedger).where(FiatLedger.account_id == account_id)).all()
     locked = sum(r.amount for r in rows if r.entry_type == "lock")
     released = sum(r.amount for r in rows if r.entry_type == "release")

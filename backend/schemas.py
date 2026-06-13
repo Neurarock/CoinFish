@@ -3,21 +3,21 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 # --- auth --------------------------------------------------------------------
 class SignupIn(BaseModel):
     role: str                      # "lender" | "borrower"
     company_name: str
-    email: EmailStr
+    email: str
     password: str
     contact_name: str = ""
     company_number: str = ""       # e.g. Companies House number (cosmetic for demo)
 
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 

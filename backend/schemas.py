@@ -142,6 +142,7 @@ class RepayIn(BaseModel):
 
 class QuotesAllIn(BaseModel):
     amount: float                  # request quotes for this amount from every pool
+    term_hours: int = 24           # borrower's custom term; each pool caps it at its max
 
 
 class ReceiveRlusdIn(BaseModel):

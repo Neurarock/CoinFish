@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from .. import config
 from ..runtime import rt
 from ..schemas import PoolOut
-from ..services import explorer_object
+from ..services import explorer_account, explorer_object
 
 router = APIRouter(prefix="/pools", tags=["pools"])
 
@@ -29,8 +29,10 @@ def pool_out(key: str) -> PoolOut:
         first_loss_capital=round(p.first_loss_capital, 2),
         vault_id=p.vault_id,
         loan_broker_id=p.loan_broker_id,
-        vault_explorer_url=explorer_object(p.vault_id),
-        loan_broker_explorer_url=explorer_object(p.loan_broker_id),
+        # The explorer has no per-object page; link to the operator account that
+        # owns the vault + broker (falling back to the object id if unknown).
+        vault_explorer_url=explorer_account(rt.operator_address) or explorer_object(p.vault_id),
+        loan_broker_explorer_url=explorer_account(rt.operator_address) or explorer_object(p.loan_broker_id),
     )
 
 

@@ -89,8 +89,24 @@ class Runtime:
         self.quotes: dict[str, Quote] = {}
         self.exit_queues: dict[str, ExitQueue] = {}
         self.fees_collected: float = 0.0      # CoinFish cumulative fee revenue (demo)
+        self._operator_address: str = os.getenv("COINFISH_OPERATOR_ADDRESS", "")
         self._load_setup()
         self._seed_demo_liquidity()
+
+    @property
+    def operator_address(self) -> str:
+        """Classic address of the operator (owns every vault + loan broker).
+
+        The XRPL explorer has no per-object page, so vault/broker objects are
+        verified by opening the operator account that owns them.
+        """
+        if not self._operator_address and self.operator_seed:
+            try:
+                from xrpl.wallet import Wallet
+                self._operator_address = Wallet.from_seed(self.operator_seed).classic_address
+            except Exception:
+                self._operator_address = ""
+        return self._operator_address
 
     # -- setup ------------------------------------------------------------
     def _load_setup(self) -> None:

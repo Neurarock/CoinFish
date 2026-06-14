@@ -16,6 +16,7 @@ const QUOTE_WINDOW = 5; // seconds a quote stays live
 
 export default function BorrowerBorrow() {
   const [amount, setAmount] = useState(20000);
+  const [term, setTerm] = useState(24);      // borrower's custom term (hours)
   const [data, setData] = useState(null);   // { amount, quotes: [...] }
   const [info, setInfo] = useState(null);    // borrower onboarding snapshot
   const [now, setNow] = useState(Date.now() / 1000);
@@ -38,7 +39,7 @@ export default function BorrowerBorrow() {
     setMsg(null);
     setLoading(true);
     try {
-      const r = await api.quotesAll({ amount: Number(amount) });
+      const r = await api.quotesAll({ amount: Number(amount), term_hours: Number(term) });
       setData(r);
     } catch (e) { setMsg({ error: e.message }); }
     finally { setLoading(false); }
@@ -75,19 +76,25 @@ export default function BorrowerBorrow() {
         <span className="morph-text">Borrow</span>
       </h1>
       <p className="mt-1 mb-6" style={{ color: "var(--fg-soft)" }}>
-        Enter an amount and we quote every pool at once. Each pool commits for a
-        different term — longer terms are cheaper, shorter terms are more flexible —
-        so it pays to shop around. Quotes are live for {QUOTE_WINDOW} seconds.
+        Choose an amount and a term, and we quote every pool at once. The term is
+        yours to set — each pool just caps it at its own maximum (Conservative 24h,
+        Balanced 48h, High-Yield 72h), so longer commitments are only offered by
+        some pools. Longer terms price cheaper. Quotes are live for {QUOTE_WINDOW} seconds.
       </p>
 
       {info && <Readiness info={info} />}
 
       <div className="card p-5">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex-1">
+          <label className="flex-1 min-w-[10rem]">
             <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Amount (RLUSD)</span>
             <input className="input mt-1" type="number" value={amount}
               onChange={(e) => setAmount(e.target.value)} />
+          </label>
+          <label className="w-40">
+            <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Term (hours)</span>
+            <input className="input mt-1" type="number" min="1" max="72" value={term}
+              onChange={(e) => setTerm(e.target.value)} />
           </label>
           <Button onClick={getQuotes} disabled={loading}>
             {loading ? "Quoting…" : data ? "Re-quote all pools" : "Get quotes from all pools"}
@@ -198,9 +205,15 @@ function QuoteCard({ p, left, onAccept }) {
       <div className="mt-3 space-y-1">
         <Row k="Principal" v={rlusd(q.principal)} />
         <Row k="Term" v={`${q.term_hours} hours`} />
+        <Row k="Max term" v={`${p.max_term_hours} hours`} />
         <Row k="Total interest" v={rlusd(q.total_interest)} />
         <Row k="Origination fee" v={rlusd(q.origination_fee)} />
       </div>
+      {p.term_capped && (
+        <div className="mt-2 text-[11px]" style={{ color: "var(--warn)" }}>
+          Your {p.requested_term_hours}h term is capped to this pool’s {p.max_term_hours}h maximum.
+        </div>
+      )}
 
       <Button className="mt-4 w-full justify-center" disabled={expired} onClick={onAccept}>
         {expired ? "Expired — re-quote" : `Accept · ${left.toFixed(1)}s`}
@@ -224,7 +237,7 @@ function ThankYouCard({ p }) {
           {p.reason || "You’re not eligible for this pool right now."}
         </div>
         <div className="mt-3 text-[11px]" style={{ color: "var(--fg-soft)" }}>
-          {p.default_term_hours}h term · from {pct(p.base_apr)} APR
+          up to {p.max_term_hours}h term · from {pct(p.base_apr)} APR
         </div>
       </div>
     </div>

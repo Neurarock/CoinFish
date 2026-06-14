@@ -205,21 +205,27 @@ def request_quote(body: QuoteIn, acct: Account = Depends(borrower_only),
 @router.post("/quotes")
 def request_all_quotes(body: QuotesAllIn, acct: Account = Depends(borrower_only),
                        session: Session = Depends(session_dep)) -> dict:
-    """Quote `amount` against EVERY pool at once so the borrower can shop around.
+    """Quote `amount` for the borrower's custom `term_hours` against EVERY pool.
 
-    Each pool uses its own default term, so rates differ and the comparison is
-    meaningful. Eligible pools return a live (5s) quote; ineligible pools return
-    a reason and no quote (the UI shows a polite "thank you" card instead).
+    The term is the borrower's choice; each pool caps it at its own maximum term
+    (Conservative 24h, Balanced 48h, High-Yield 72h), so longer commitments are
+    only available from some pools and the comparison is meaningful. Eligible
+    pools return a live (5s) quote; ineligible pools return a reason and no quote.
     """
     elig = {e["key"]: e for e in _pool_eligibility(session, acct)}
     available = collateral_balance(session, acct.id) - collateral_locked(session, acct.id)
     limit = _credit_limit(available)
+    requested_term = max(1, int(body.term_hours or 24))
     rows: list[dict] = []
     for key, pool in rt.pools.items():
         e = elig[key]
+        pool_max_term = pool.default_term_hours
+        term = min(requested_term, pool_max_term)        # cap the custom term per pool
         row = {
             "pool_key": key, "name": pool.name, "risk_tier": pool.risk_tier,
-            "base_apr": pool.base_apr, "default_term_hours": pool.default_term_hours,
+            "base_apr": pool.base_apr, "max_term_hours": pool_max_term,
+            "requested_term_hours": requested_term, "term_hours": term,
+            "term_capped": requested_term > pool_max_term,
             "available_liquidity": round(pool.available, 2),
             "max_borrow": e["max_borrow"], "eligible": e["eligible"],
             "reason": e["reason"], "quote": None,
@@ -233,7 +239,7 @@ def request_all_quotes(body: QuotesAllIn, acct: Account = Depends(borrower_only)
                 credit_score=acct.credit_score or 680,
                 fiat_deposit=available,
                 credit_limit=limit,
-                term_hours=pool.default_term_hours,
+                term_hours=term,
                 pool_drawn=pool.drawn,
                 pool_tvl=pool.tvl,
             )

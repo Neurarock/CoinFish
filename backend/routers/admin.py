@@ -13,10 +13,17 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
-from ..db import Account, Loan, LoanStatus, Role
+from ..db import Account, Deposit, Loan, LoanStatus, Role
 from ..runtime import rt
 from ..schemas import AdminDashboardOut, GraceExtendIn
-from ..services import require_role, session_dep
+from ..services import (
+    collateral_balance,
+    collateral_locked,
+    explorer_account,
+    explorer_tx,
+    require_role,
+    session_dep,
+)
 from .pools import pool_out
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -78,6 +85,70 @@ def dashboard(session: Session = Depends(session_dep)) -> AdminDashboardOut:
         pools=[pool_out(k).model_dump() for k in rt.pools],
         at_risk_loans=at_risk,
     )
+
+
+@router.get("/accounts")
+def accounts(session: Session = Depends(session_dep)) -> dict:
+    """Participant registry for the CoinFish operator view.
+
+    Logs every signed-up company (the off-chain KYC record) alongside their
+    on-chain identity (XRPL account + XLS-70 credential) and their live
+    position: lenders' deposits, borrowers' pledged collateral and borrowing.
+    Also returns the permissioned-domain / access-list links.
+    """
+    rows = session.exec(select(Account)).all()
+    out = []
+    for a in rows:
+        rec = {
+            "id": a.id, "role": a.role.value, "company_name": a.company_name,
+            "email": a.email, "company_number": "",
+            "kyc_status": a.kyc_status.value, "credit_status": a.credit_status.value,
+            "credit_score": a.credit_score,
+            "xrpl_address": a.xrpl_address,
+            "account_explorer_url": explorer_account(a.xrpl_address),
+            "credential_id": a.credential_id or "",
+            "credential_explorer_url": explorer_tx(a.credential_id) if a.credential_id else "",
+            "wallet_rlusd_balance": round(a.wallet_rlusd_balance or 0.0, 2),
+        }
+        if a.role == Role.LENDER:
+            deps = session.exec(select(Deposit).where(Deposit.account_id == a.id)).all()
+            by_pool: dict[str, float] = {}
+            for d in deps:
+                by_pool[d.pool_key] = round(by_pool.get(d.pool_key, 0.0) + d.principal, 2)
+            rec["lending"] = {
+                "total_deposited": round(sum(d.principal for d in deps), 2),
+                "by_pool": by_pool,
+            }
+        else:
+            coll = collateral_balance(session, a.id)
+            locked = collateral_locked(session, a.id)
+            loans = session.exec(select(Loan).where(Loan.account_id == a.id)).all()
+            active = [l for l in loans if l.status == LoanStatus.ACTIVE]
+            rec["borrowing"] = {
+                "collateral_pledged": coll,
+                "collateral_locked": locked,
+                "collateral_available": round(coll - locked, 2),
+                "outstanding": round(sum(l.principal for l in active), 2),
+                "active_loans": len(active),
+                "total_loans": len(loans),
+                "interest_paid": round(sum(l.interest_paid for l in loans), 2),
+            }
+        out.append(rec)
+
+    op = rt.operator_address
+    permission = {
+        "domain_id": rt.domain_id,
+        "issuer_address": rt.issuer_address,
+        "issuer_explorer_url": explorer_account(rt.issuer_address),
+        "operator_address": op,
+        "operator_explorer_url": explorer_account(op),
+        # the permissioned domain + credentials are administered from the
+        # operator account; the explorer renders accounts, not raw objects.
+        "permission_list_explorer_url": explorer_account(op),
+    }
+    return {"permission": permission, "accounts": out,
+            "lenders": sum(1 for a in rows if a.role == Role.LENDER),
+            "borrowers": sum(1 for a in rows if a.role == Role.BORROWER)}
 
 
 @router.post("/loans/grace")

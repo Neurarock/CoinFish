@@ -7,7 +7,7 @@ from sqlmodel import Session
 from .. import config
 from ..db import Loan
 from ..runtime import LIVE_CHAIN, rt
-from ..services import explorer_object, explorer_tx, session_dep
+from ..services import explorer_account, explorer_object, explorer_tx, session_dep
 
 router = APIRouter(prefix="/loans", tags=["loans"])
 
@@ -27,7 +27,7 @@ def loan_status(loan_id: int, session: Session = Depends(session_dep)) -> dict:
         "status": loan.status.value,
         "default_charge": loan.default_charge,
         "xrpl_loan_id": loan.xrpl_loan_id,
-        "loan_explorer_url": explorer_object(loan.xrpl_loan_id),
+        "loan_explorer_url": explorer_account(rt.operator_address) or explorer_object(loan.xrpl_loan_id),
         "origination_tx": loan.origination_tx,
         "explorer_url": explorer_tx(loan.origination_tx),
     }

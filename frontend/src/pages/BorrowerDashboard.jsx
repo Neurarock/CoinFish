@@ -8,7 +8,7 @@ import Layout from "../components/Layout.jsx";
 import TxLedger from "../components/TxLedger.jsx";
 import QrCode from "../components/QrCode.jsx";
 import { useTx } from "../components/TxProcessing.jsx";
-import { Button, Stat, Pill, VerifyLink, rlusd, usd, pct } from "../components/ui.jsx";
+import { Button, Stat, Pill, VerifyLink, IdentityLinks, rlusd, usd, pct } from "../components/ui.jsx";
 
 export default function BorrowerDashboard() {
   const [d, setD] = useState(null);
@@ -62,7 +62,7 @@ export default function BorrowerDashboard() {
         <Stat label="Available collateral" value={usd(d.collateral_available)} />
       </div>
 
-      <ReceiveWallet account={d.account} />
+      <ReceiveWallet account={d.account} track={track} onCredited={load} />
 
       {/* itemised bill */}
       <div className="card mt-6 p-5">
@@ -93,7 +93,11 @@ export default function BorrowerDashboard() {
               {l.default_charge > 0 && <> · default charge {rlusd(l.default_charge)}</>}
             </div>
             <VerifyLink href={l.origination_explorer_url} hash={l.origination_tx} label="Verify origination on XRPL" />
-            <VerifyLink href={l.loan_explorer_url} hash={l.xrpl_loan_id} label="Verify loan object" />
+            {l.xrpl_loan_id && (
+              <div className="mt-1 text-[11px]" style={{ color: "var(--fg-soft)" }}>
+                Loan object <span className="mono">{l.xrpl_loan_id.slice(0, 14)}…</span>
+              </div>
+            )}
 
             {l.status === "active" && l.payoff && (
               <div className="mt-3 rounded-xl p-3 text-xs" style={{ background: "var(--bg)", border: "1px solid var(--line)" }}>
@@ -145,10 +149,10 @@ export default function BorrowerDashboard() {
 
 // Receive RLUSD into the connected wallet — same QR pattern as the fiat top-up,
 // but on the XRPL side, so the borrower can fund repayments.
-function ReceiveWallet({ account }) {
+function ReceiveWallet({ account, track, onCredited }) {
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState(null);
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState(5000);
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState("");
 
@@ -158,6 +162,23 @@ function ReceiveWallet({ account }) {
       const r = await api.receiveRlusd({ amount: Number(amount) || 0 });
       setInfo(r);
       setOpen(true);
+    } catch (e) { setErr(e.message); }
+  }
+  // Mocks an incoming transfer from an external wallet, but actually credits
+  // real RLUSD to the connected Devnet wallet so repayment can be tested.
+  async function deposit() {
+    setErr("");
+    try {
+      await track(
+        api.depositRlusd({ amount: Number(amount) || 0 }),
+        {
+          title: "Receiving RLUSD",
+          steps: ["Incoming transfer detected", "Issuing RLUSD on Devnet",
+                  "Submitting to XRPL", "Crediting your wallet"],
+          success: "RLUSD received",
+        },
+      );
+      onCredited?.();
     } catch (e) { setErr(e.message); }
   }
   function copy() {
@@ -176,11 +197,12 @@ function ReceiveWallet({ account }) {
               ? <>{account.xrpl_address.slice(0, 12)}…{account.xrpl_address.slice(-6)}</>
               : "No wallet connected"}
           </div>
+          <IdentityLinks account={account} />
         </div>
         <div className="flex items-center gap-3">
           <Pill tone="good">{rlusd(account.wallet_rlusd_balance)}</Pill>
           <Button variant={open ? "ghost" : "primary"} onClick={() => (open ? setOpen(false) : show())}>
-            {open ? "Hide" : "Receive RLUSD"}
+            {open ? "Hide" : "Deposit RLUSD"}
           </Button>
         </div>
       </div>
@@ -193,7 +215,7 @@ function ReceiveWallet({ account }) {
           <div className="text-sm space-y-2">
             <div className="flex items-end gap-2">
               <label>
-                <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Request amount (RLUSD, optional)</span>
+                <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>Amount (RLUSD)</span>
                 <input className="input mt-1 w-44" type="number" value={amount}
                   onChange={(e) => setAmount(e.target.value)} />
               </label>
@@ -202,12 +224,14 @@ function ReceiveWallet({ account }) {
             <Detail k="Network" v="XRPL Devnet" />
             <Detail k="Asset" v={info.currency} />
             <Detail k="Send to" v={`${info.xrpl_address.slice(0, 16)}…${info.xrpl_address.slice(-6)}`} />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={deposit}>Simulate incoming transfer</Button>
               <Button variant="ghost" onClick={copy}>{copied ? "Copied ✓" : "Copy address"}</Button>
               <VerifyLink href={info.explorer_url} label="View account on XRPL" />
             </div>
             <div className="text-xs" style={{ color: "var(--fg-soft)" }}>
-              Scan to send RLUSD to your wallet, then repay your loans below.
+              “Simulate incoming transfer” credits real RLUSD to this wallet on Devnet
+              (mocking an external sender) so you can test repayment.
             </div>
           </div>
         </div>

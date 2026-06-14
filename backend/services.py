@@ -112,6 +112,8 @@ def account_out(acct: Account) -> AccountOut:
         wallet_rlusd_balance=round(acct.wallet_rlusd_balance or 0.0, 2),
         wallet_explorer_url=explorer_account(acct.xrpl_address) if acct.xrpl_address else "",
         wallet_connected=bool(acct.xrpl_address),
+        credential_id=acct.credential_id or "",
+        credential_explorer_url=explorer_tx(acct.credential_id) if acct.credential_id else "",
     )
 
 

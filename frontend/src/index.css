@@ -379,3 +379,12 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   background: color-mix(in srgb, var(--bg-soft) 86%, transparent);
 }
 .mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* ----------------------------------------------------------------------------
+   Custom fish cursor across the whole site (downscaled logo, hotspot near the
+   nose). Interactive elements keep a `pointer` fallback for older browsers.
+---------------------------------------------------------------------------- */
+html, body, .app-bg { cursor: url("/cursor-fish.png") 6 4, auto; }
+a, button, .btn, label, summary, select, [role="button"], .pill, .verify-link,
+.devnet-badge, [onclick] { cursor: url("/cursor-fish.png") 6 4, pointer; }
+input, textarea { cursor: url("/cursor-fish.png") 6 4, text; }

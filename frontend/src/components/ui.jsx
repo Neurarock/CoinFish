@@ -35,6 +35,20 @@ export function VerifyLink({ href, hash, label = "Verify on XRPL" }) {
   );
 }
 
+// A user's on-chain identity IS their XRPL account (their public key / address).
+// Borrowers additionally hold an XLS-70 Credential issued by CoinFish.
+export function IdentityLinks({ account }) {
+  if (!account?.xrpl_address) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      <VerifyLink href={account.wallet_explorer_url} hash={account.xrpl_address} label="On-chain identity" />
+      {account.credential_explorer_url && (
+        <VerifyLink href={account.credential_explorer_url} hash={account.credential_id} label="Credential (XLS-70)" />
+      )}
+    </div>
+  );
+}
+
 export function Pill({ children, tone = "accent" }) {
   const map = {
     accent: ["var(--accent)", "var(--accent-fg)"],

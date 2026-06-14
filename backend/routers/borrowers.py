@@ -27,6 +27,7 @@ from ..schemas import (
     QuotesAllIn,
     ReceiveRlusdIn,
     ReceiveRlusdOut,
+    RlusdDepositIn,
     RepayIn,
 )
 from ..services import (
@@ -284,6 +285,47 @@ def receive_rlusd(body: ReceiveRlusdIn, acct: Account = Depends(borrower_only)) 
     )
 
 
+@router.post("/wallet/deposit")
+def deposit_rlusd(body: RlusdDepositIn, acct: Account = Depends(borrower_only),
+                  session: Session = Depends(session_dep)) -> dict:
+    """Credit REAL RLUSD to the borrower's connected Devnet wallet.
+
+    The demo mocks an external sender (e.g. an exchange withdrawal or a friend's
+    wallet), but the credit is a real on-chain RLUSD issuance to the borrower's
+    address, so the wallet genuinely holds RLUSD and repayment can be tested
+    end to end on Devnet. The borrower already holds an RLUSD trustline (created
+    when they connected their wallet).
+    """
+    require_devnet_transactions("RLUSD deposit")
+    if not acct.xrpl_address:
+        raise HTTPException(400, "connect a wallet first")
+    if body.amount <= 0:
+        raise HTTPException(400, "amount must be positive")
+    if not rt.issuer_seed or not rt.issuer_address:
+        raise HTTPException(503, "RLUSD issuer is not configured on this Devnet setup")
+    from ..xrpl_service import assets
+    from ..xrpl_service.client import get_client, wallet_from_seed
+    client = get_client()
+    res = assets.mint_rlusd(wallet_from_seed(rt.issuer_seed), acct.xrpl_address,
+                            round(body.amount, 2), client)
+    if not res.ok:
+        raise HTTPException(502, f"RLUSD deposit failed on Devnet: {res.engine_result}")
+    record_onchain_tx(
+        session,
+        account_id=acct.id,
+        action="rlusd_deposit",
+        tx_hash=res.hash,
+        engine_result=res.engine_result,
+        amount=round(body.amount, 2),
+    )
+    acct.wallet_rlusd_balance = assets.rlusd_balance(acct.xrpl_address, rt.issuer_address, client)
+    session.add(acct)
+    session.commit()
+    return {"ok": True, "amount": round(body.amount, 2), "tx_hash": res.hash,
+            "explorer_url": explorer_tx(res.hash),
+            "wallet_balance": acct.wallet_rlusd_balance}
+
+
 @router.post("/loans/accept")
 def accept_quote(body: AcceptQuoteIn, acct: Account = Depends(borrower_only),
                  session: Session = Depends(session_dep)) -> dict:
@@ -343,7 +385,7 @@ def accept_quote(body: AcceptQuoteIn, acct: Account = Depends(borrower_only),
     return {"ok": True, "loan_id": loan.id, "tx_hash": tx_hash,
             "explorer_url": explorer_tx(tx_hash),
             "xrpl_loan_id": loan_id,
-            "loan_explorer_url": explorer_object(loan_id),
+            "loan_explorer_url": explorer_account(rt.operator_address) or explorer_object(loan_id),
             "wallet_balance": acct.wallet_rlusd_balance,
             "disbursed_to": acct.xrpl_address, "principal": q.principal}
 
@@ -516,7 +558,7 @@ def dashboard(acct: Account = Depends(borrower_only),
         "interest_paid": round(l.interest_paid, 2), "status": l.status.value,
         "default_charge": l.default_charge,
         "xrpl_loan_id": l.xrpl_loan_id,
-        "loan_explorer_url": explorer_object(l.xrpl_loan_id),
+        "loan_explorer_url": explorer_account(rt.operator_address) or explorer_object(l.xrpl_loan_id),
         "origination_tx": l.origination_tx,
         "origination_explorer_url": explorer_tx(l.origination_tx),
         "due_at": l.due_at.isoformat() if l.due_at else None,

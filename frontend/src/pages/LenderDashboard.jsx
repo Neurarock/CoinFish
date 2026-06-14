@@ -7,7 +7,7 @@ import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
 import TxLedger from "../components/TxLedger.jsx";
 import { useTx } from "../components/TxProcessing.jsx";
-import { Button, Stat, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
+import { Button, Stat, Pill, VerifyLink, IdentityLinks, rlusd, pct } from "../components/ui.jsx";
 
 export default function LenderDashboard() {
   const [d, setD] = useState(null);
@@ -43,6 +43,7 @@ export default function LenderDashboard() {
   return (
     <Layout role="lender">
       <h1 className="text-3xl font-extrabold">Your lending dashboard</h1>
+      <IdentityLinks account={d.account} />
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <Stat label="Total deposited" value={rlusd(d.total_deposited)} />
         <Stat label="Vault shares" value={d.total_shares.toLocaleString()} />

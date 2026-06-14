@@ -52,6 +52,7 @@ export const api = {
   quote: (b) => req("POST", "/borrowers/quote", b),
   quotesAll: (b) => req("POST", "/borrowers/quotes", b),
   receiveRlusd: (b) => req("POST", "/borrowers/wallet/receive", b),
+  depositRlusd: (b) => req("POST", "/borrowers/wallet/deposit", b),
   acceptQuote: (b) => req("POST", "/borrowers/loans/accept", b),
   repay: (loanId, b) => req("POST", `/borrowers/loans/${loanId}/repay`, b),
   defaultLoan: (loanId) => req("POST", `/borrowers/loans/${loanId}/default`),
@@ -59,5 +60,6 @@ export const api = {
 
   // admin / coinfish vault
   adminDashboard: () => req("GET", "/admin/dashboard"),
+  adminAccounts: () => req("GET", "/admin/accounts"),
   extendGrace: (b) => req("POST", "/admin/loans/grace", b),
 };

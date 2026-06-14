@@ -34,6 +34,8 @@ class AccountOut(BaseModel):
     wallet_rlusd_balance: float = 0.0
     wallet_explorer_url: str = ""
     wallet_connected: bool
+    credential_id: str = ""             # XLS-70 credential accept-tx (borrower identity)
+    credential_explorer_url: str = ""
 
 
 class TokenOut(BaseModel):
@@ -147,6 +149,10 @@ class QuotesAllIn(BaseModel):
 
 class ReceiveRlusdIn(BaseModel):
     amount: float = 0.0            # optional amount to encode in the QR (0 = open)
+
+
+class RlusdDepositIn(BaseModel):
+    amount: float                 # RLUSD to credit to the connected wallet (real Devnet mint)
 
 
 class ReceiveRlusdOut(BaseModel):

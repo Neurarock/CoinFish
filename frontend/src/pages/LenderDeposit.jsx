@@ -66,9 +66,12 @@ export default function LenderDeposit() {
             <Row k="First-loss buffer" v={pct(p.first_loss_buffer)} />
             <Row k="First-loss capital" v={rlusd(p.first_loss_capital)} />
             <Row k="Idle / available" v={rlusd(p.available)} />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <VerifyLink href={p.vault_explorer_url} hash={p.vault_id} label="Verify vault" />
-              <VerifyLink href={p.loan_broker_explorer_url} hash={p.loan_broker_id} label="Verify broker" />
+            <div className="mt-3">
+              <VerifyLink href={p.vault_explorer_url} label="Verify on XRPL" />
+              <div className="mt-1 text-[11px]" style={{ color: "var(--fg-soft)" }}>
+                vault <span className="mono">{(p.vault_id || "—").slice(0, 12)}…</span> · broker{" "}
+                <span className="mono">{(p.loan_broker_id || "—").slice(0, 12)}…</span>
+              </div>
             </div>
             <Button variant={sel === p.key ? "primary" : "ghost"} className="mt-3 w-full justify-center"
               onClick={() => setSel(p.key)}>

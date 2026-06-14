@@ -7,16 +7,18 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import TxLedger from "../components/TxLedger.jsx";
-import { Button, Pill, rlusd, pct } from "../components/ui.jsx";
+import { Button, Pill, VerifyLink, rlusd, usd, pct } from "../components/ui.jsx";
 
 export default function VaultDashboard() {
   const [d, setD] = useState(null);
+  const [acc, setAcc] = useState(null);
   const [hours, setHours] = useState({});
   const [txs, setTxs] = useState([]);
   const [tick, setTick] = useState(0);
 
   const load = () => {
     api.adminDashboard().then(setD);
+    api.adminAccounts().then(setAcc).catch(() => setAcc(null));
     api.allTransactions().then(setTxs).catch(() => setTxs([]));
   };
   useEffect(() => {
@@ -126,9 +128,83 @@ export default function VaultDashboard() {
         </div>
       )}
 
+      {/* permissioned access list */}
+      {acc?.permission && (
+        <>
+          <SectionTitle>Permissioned access list</SectionTitle>
+          <div className="exp-panel p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm" style={{ color: "var(--fg-soft)" }}>
+                Borrowers are gated by an on-chain Permissioned Domain (XLS-80) and CoinFish
+                Credentials (XLS-70), administered from the operator account.
+              </div>
+              <VerifyLink href={acc.permission.permission_list_explorer_url} label="View access list on XRPL" />
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3 text-xs">
+              <KV k="Domain ID" v={acc.permission.domain_id} />
+              <KV k="Issuer" v={acc.permission.issuer_address} href={acc.permission.issuer_explorer_url} />
+              <KV k="Operator" v={acc.permission.operator_address} href={acc.permission.operator_explorer_url} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* participant registry: company detail + on-chain identity + position */}
+      {acc?.accounts?.length > 0 && (
+        <>
+          <SectionTitle>
+            Participants
+            <span className="ml-2"><Pill tone="good">{acc.lenders} lenders</Pill></span>
+            <span className="ml-1"><Pill tone="warn">{acc.borrowers} borrowers</Pill></span>
+          </SectionTitle>
+          <div className="exp-panel">
+            <div className="exp-row exp-head" style={{ gridTemplateColumns: "1.6fr .7fr 1.5fr 1.6fr" }}>
+              <div>Company</div><div>Role</div><div>On-chain identity</div><div className="text-right">Position</div>
+            </div>
+            {acc.accounts.map((a) => (
+              <div key={a.id} className="exp-row" style={{ gridTemplateColumns: "1.6fr .7fr 1.5fr 1.6fr" }}>
+                <div>
+                  <div className="font-bold">{a.company_name}</div>
+                  <div className="text-[11px]" style={{ color: "var(--fg-soft)" }}>{a.email} · KYC {a.kyc_status}</div>
+                </div>
+                <div><Pill tone={a.role === "lender" ? "good" : "warn"}>{a.role}</Pill></div>
+                <div className="text-xs">
+                  {a.xrpl_address ? (
+                    <a className="mono" href={a.account_explorer_url} target="_blank" rel="noreferrer"
+                      style={{ color: "var(--accent)" }}>
+                      {a.xrpl_address.slice(0, 10)}…{a.xrpl_address.slice(-4)} ↗
+                    </a>
+                  ) : <span style={{ color: "var(--fg-soft)" }}>no wallet</span>}
+                  {a.credential_explorer_url && (
+                    <a className="ml-2" href={a.credential_explorer_url} target="_blank" rel="noreferrer"
+                      style={{ color: "var(--fg-soft)" }}>credential ↗</a>
+                  )}
+                </div>
+                <div className="text-right text-xs mono">
+                  {a.lending
+                    ? <span>{rlusd(a.lending.total_deposited)} supplied</span>
+                    : <span>{usd(a.borrowing.collateral_pledged)} pledged · {rlusd(a.borrowing.outstanding)} borrowed</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       <SectionTitle>XRPL transaction ledger</SectionTitle>
       <TxLedger rows={txs} title="" />
     </Layout>
+  );
+}
+
+function KV({ k, v, href }) {
+  return (
+    <div className="control-panel exp-panel p-2">
+      <div className="exp-head">{k}</div>
+      {href
+        ? <a className="mono text-xs" href={href} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>{(v || "—").slice(0, 22)}… ↗</a>
+        : <div className="mono text-xs" style={{ color: "var(--fg)" }}>{(v || "—").slice(0, 26)}{v && v.length > 26 ? "…" : ""}</div>}
+    </div>
   );
 }
 

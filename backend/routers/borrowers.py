@@ -87,6 +87,7 @@ def _payoff(loan: Loan) -> dict:
 
 def _pool_eligibility(session: Session, acct: Account) -> list[dict]:
     """Per-pool borrowing eligibility with a human-readable reason when blocked."""
+    rt.refresh_liquidity()           # use REAL on-chain pool liquidity
     available = collateral_balance(session, acct.id) - collateral_locked(session, acct.id)
     limit = _credit_limit(available)
     outstanding = _outstanding(session, acct.id)
@@ -104,7 +105,9 @@ def _pool_eligibility(session: Session, acct: Account) -> list[dict]:
         elif headroom <= 0:
             reason = "No borrowing headroom left — repay or add collateral."
         elif liquidity <= 0:
-            reason = "This pool is fully utilised right now — try again shortly."
+            reason = ("This pool has no lender liquidity yet — it needs a lender deposit."
+                      if pool.tvl <= 0 else
+                      "This pool is fully utilised right now — try again shortly.")
         eligible = reason == ""
         out.append({
             "key": key, "name": pool.name, "risk_tier": pool.risk_tier,
@@ -231,6 +234,13 @@ def request_all_quotes(body: QuotesAllIn, acct: Account = Depends(borrower_only)
             "max_borrow": e["max_borrow"], "eligible": e["eligible"],
             "reason": e["reason"], "quote": None,
         }
+        # A loan is funded from the vault, so a pool can't quote more than its
+        # real available liquidity.
+        if e["eligible"] and round(pool.available, 2) + 1e-6 < body.amount:
+            row["eligible"] = False
+            row["reason"] = (f"This pool can only fund up to {round(pool.available, 2):,.2f} "
+                             f"RLUSD right now (needs more lender deposits).")
+            e = {**e, "eligible": False}
         if e["eligible"]:
             q = risk_engine.quote_loan(
                 pool=config.PoolConfig(pool.key, pool.name, pool.risk_tier,

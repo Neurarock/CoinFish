@@ -10,6 +10,8 @@ import TxLedger from "../components/TxLedger.jsx";
 import { useTx } from "../components/TxProcessing.jsx";
 import { Button, Pill, VerifyLink, rlusd, usd, pct } from "../components/ui.jsx";
 
+const POOL_COLS = "1.5fr .7fr 1.4fr 1fr 1fr 1fr 1fr .7fr";
+
 export default function VaultDashboard() {
   const [d, setD] = useState(null);
   const [acc, setAcc] = useState(null);
@@ -90,13 +92,16 @@ export default function VaultDashboard() {
       </div>
 
       {/* pools table */}
-      <SectionTitle>Pools</SectionTitle>
-      <div className="exp-panel">
-        <div className="exp-row exp-head" style={{ gridTemplateColumns: "1.4fr .7fr 1.6fr 1fr .8fr" }}>
-          <div>Pool</div><div>Risk</div><div>Utilisation</div><div className="text-right">TVL</div><div className="text-right">Cover</div>
+      <SectionTitle>Pools <span className="ml-1 text-[10px] font-semibold" style={{ color: "var(--fg-soft)" }}>(live on-chain)</span></SectionTitle>
+      <div className="exp-panel overflow-x-auto">
+        <div className="exp-row exp-head" style={{ gridTemplateColumns: POOL_COLS, minWidth: 640 }}>
+          <div>Pool</div><div>Risk</div><div>Utilisation</div>
+          <div className="text-right">TVL</div><div className="text-right">Available</div>
+          <div className="text-right">Out on loan</div><div className="text-right">First-loss</div>
+          <div className="text-right">Cover</div>
         </div>
         {d.pools.map((p) => (
-          <div key={p.key} className="exp-row" style={{ gridTemplateColumns: "1.4fr .7fr 1.6fr 1fr .8fr" }}>
+          <div key={p.key} className="exp-row" style={{ gridTemplateColumns: POOL_COLS, minWidth: 640 }}>
             <div className="font-bold">{p.name}</div>
             <div><Pill tone={p.utilisation > 0.85 ? "bad" : p.utilisation > 0.6 ? "warn" : "good"}>{p.risk_tier ?? p.key}</Pill></div>
             <div className="flex items-center gap-2">
@@ -104,6 +109,9 @@ export default function VaultDashboard() {
               <span className="mono text-xs" style={{ color: "var(--fg-soft)" }}>{pct(p.utilisation)}</span>
             </div>
             <div className="mono text-right">{rlusd(p.tvl)}</div>
+            <div className="mono text-right" style={{ color: "var(--good)" }}>{rlusd(p.available)}</div>
+            <div className="mono text-right" style={{ color: "var(--fg-soft)" }}>{rlusd(p.drawn)}</div>
+            <div className="mono text-right">{rlusd(p.first_loss_capital)}</div>
             <div className="mono text-right" style={{ color: "var(--fg-soft)" }}>{pct(p.first_loss_buffer)}</div>
           </div>
         ))}

@@ -95,6 +95,7 @@ class Runtime:
         self.exit_queues: dict[str, ExitQueue] = {}
         self.fees_collected: float = 0.0      # CoinFish cumulative fee revenue (demo)
         self._operator_address: str = os.getenv("COINFISH_OPERATOR_ADDRESS", "")
+        self._liq_synced_at: float = 0.0
         self._load_setup()
         self._seed_demo_liquidity()
 
@@ -146,15 +147,48 @@ class Runtime:
             pr.domain_id = os.getenv(f"COINFISH_POOL_{env_key}_DOMAIN_ID", pr.domain_id)
 
     def _seed_demo_liquidity(self) -> None:
-        """Give each pool plausible starting numbers so the UI looks alive."""
-        seed = {"low": (500_000, 180_000, 100_000),
-                "med": (320_000, 210_000, 32_000),
-                "high": (140_000, 119_000, 7_000)}
+        """Starting numbers before the first on-chain sync. Real values from the
+        ledger (refresh_liquidity) override these once Devnet is reachable."""
+        seed = {"low": (0, 0, 0), "med": (0, 0, 0), "high": (0, 0, 0)}
         for key, (tvl, drawn, flc) in seed.items():
             if key in self.pools:
                 self.pools[key].tvl = tvl
                 self.pools[key].drawn = drawn
                 self.pools[key].first_loss_capital = flc
+
+    def refresh_liquidity(self, ttl: float = 8.0) -> None:
+        """Sync each pool's TVL / drawn / first-loss capital from the REAL on-chain
+        vault + loan broker, so dashboards and quotes reflect actual liquidity
+        rather than placeholder numbers. Cached for `ttl` seconds; fails soft."""
+        if not LIVE_CHAIN:
+            return
+        now = time.time()
+        if now - self._liq_synced_at < ttl:
+            return
+        try:
+            from .xrpl_service import broker as broker_svc
+            from .xrpl_service import vault as vault_svc
+            from .xrpl_service.client import get_client
+            client = get_client()
+        except Exception:
+            return
+        synced = False
+        for pr in self.pools.values():
+            if pr.vault_id:
+                try:
+                    available, total = vault_svc.vault_liquidity(pr.vault_id, client)
+                    pr.tvl = round(total, 2)
+                    pr.drawn = round(max(0.0, total - available), 2)
+                    synced = True
+                except Exception:
+                    pass
+            if pr.loan_broker_id:
+                try:
+                    pr.first_loss_capital = round(broker_svc.cover_available(pr.loan_broker_id, client), 2)
+                except Exception:
+                    pass
+        if synced:
+            self._liq_synced_at = now
 
     # -- helpers ----------------------------------------------------------
     def pool(self, key: str) -> Optional[PoolRuntime]:

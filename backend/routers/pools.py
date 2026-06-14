@@ -12,6 +12,7 @@ router = APIRouter(prefix="/pools", tags=["pools"])
 
 
 def pool_out(key: str) -> PoolOut:
+    rt.refresh_liquidity()           # pull real on-chain TVL / first-loss (cached)
     p = rt.pools[key]
     net_apr = round(p.base_apr * (1 - config.MANAGEMENT_FEE), 4)
     return PoolOut(

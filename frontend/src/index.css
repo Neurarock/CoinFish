@@ -196,27 +196,18 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   animation: morph-pan 7s ease-in-out infinite;
 }
 
-/* A card/panel whose 1px edge is a slowly morphing gradient (the expensive bit). */
+/* A card/panel whose 1px edge is a slowly morphing gradient (the expensive bit).
+   Uses the padding-box / border-box double-background technique so it renders
+   correctly on iOS Safari (no mask-composite, which Safari handles unreliably). */
 .morph-edge {
   position: relative;
+  border: 1px solid transparent;
   border-radius: var(--radius);
-  background: var(--bg-soft);
-  isolation: isolate;
-}
-.morph-edge::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  padding: 1px;
-  border-radius: inherit;
-  background: linear-gradient(120deg, var(--accent), var(--accent-2), transparent 60%, var(--accent));
-  background-size: 240% 240%;
+  background:
+    linear-gradient(var(--bg-soft), var(--bg-soft)) padding-box,
+    linear-gradient(120deg, var(--accent), var(--accent-2), var(--accent)) border-box;
+  background-size: 100% 100%, 240% 240%;
   animation: morph-pan 9s ease-in-out infinite;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  pointer-events: none;
-  z-index: -1;
 }
 /* Soft aura behind a featured element. */
 .morph-aura { position: relative; }
@@ -298,6 +289,7 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   display: grid;
   place-items: center;
   background: radial-gradient(circle at 50% 30%, rgba(0,0,0,0.55), rgba(0,0,0,0.78));
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   animation: fade-in 0.25s ease;
 }
@@ -384,7 +376,7 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
    Custom fish cursor across the whole site (downscaled logo, hotspot near the
    nose). Interactive elements keep a `pointer` fallback for older browsers.
 ---------------------------------------------------------------------------- */
-html, body, .app-bg { cursor: url("/cursor-fish.png") 6 4, auto; }
+html, body, .app-bg { cursor: url("/cursor-fish.png") 12 10, auto; }
 a, button, .btn, label, summary, select, [role="button"], .pill, .verify-link,
-.devnet-badge, [onclick] { cursor: url("/cursor-fish.png") 6 4, pointer; }
-input, textarea { cursor: url("/cursor-fish.png") 6 4, text; }
+.devnet-badge, [onclick] { cursor: url("/cursor-fish.png") 12 10, pointer; }
+input, textarea { cursor: url("/cursor-fish.png") 12 10, text; }

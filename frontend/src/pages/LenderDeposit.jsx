@@ -69,8 +69,15 @@ export default function LenderDeposit() {
             <div className="mt-3">
               <VerifyLink href={p.vault_explorer_url} label="Verify on XRPL" />
               <div className="mt-1 text-[11px]" style={{ color: "var(--fg-soft)" }}>
-                vault <span className="mono">{(p.vault_id || "—").slice(0, 12)}…</span> · broker{" "}
-                <span className="mono">{(p.loan_broker_id || "—").slice(0, 12)}…</span>
+                {p.vault_id || p.loan_broker_id ? (
+                  <>
+                    {p.vault_id && <>vault <span className="mono">{p.vault_id.slice(0, 10)}…</span></>}
+                    {p.vault_id && p.loan_broker_id && " · "}
+                    {p.loan_broker_id && <>broker <span className="mono">{p.loan_broker_id.slice(0, 10)}…</span></>}
+                  </>
+                ) : (
+                  <span>Devnet pool IDs not configured on this backend.</span>
+                )}
               </div>
             </div>
             <Button variant={sel === p.key ? "primary" : "ghost"} className="mt-3 w-full justify-center"

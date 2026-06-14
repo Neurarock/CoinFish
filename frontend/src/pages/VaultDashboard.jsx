@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Layout from "../components/Layout.jsx";
 import TxLedger from "../components/TxLedger.jsx";
+import { useTx } from "../components/TxProcessing.jsx";
 import { Button, Pill, VerifyLink, rlusd, usd, pct } from "../components/ui.jsx";
 
 export default function VaultDashboard() {
@@ -15,6 +16,7 @@ export default function VaultDashboard() {
   const [hours, setHours] = useState({});
   const [txs, setTxs] = useState([]);
   const [tick, setTick] = useState(0);
+  const { track } = useTx();
 
   const load = () => {
     api.adminDashboard().then(setD);
@@ -30,6 +32,22 @@ export default function VaultDashboard() {
   async function extend(loan_id) {
     await api.extendGrace({ loan_id, hours: Number(hours[loan_id] || 1) });
     load();
+  }
+
+  // CoinFish (loan-broker owner) defaults a past-grace loan on-chain.
+  async function defaultLoan(loan_id) {
+    try {
+      await track(
+        api.adminDefault({ loan_id }),
+        {
+          title: "Defaulting loan",
+          steps: ["LoanManage · default", "Drawing first-loss cover",
+                  "Socialising residual loss", "Seizing pledged collateral"],
+          success: "Loan defaulted",
+        },
+      );
+      load();
+    } catch { /* overlay shows the error (e.g. not past grace yet) */ }
   }
 
   if (!d) return <Layout role="admin"><div className="px-1 py-10" style={{ color: "var(--fg-soft)" }}>Loading ledger…</div></Layout>;
@@ -102,11 +120,11 @@ export default function VaultDashboard() {
         </div>
       ) : (
         <div className="exp-panel">
-          <div className="exp-row exp-head" style={{ gridTemplateColumns: "2fr 1.2fr 1.4fr 1.6fr" }}>
-            <div>Loan</div><div className="text-right">Principal</div><div>Window</div><div>Grace control</div>
+          <div className="exp-row exp-head" style={{ gridTemplateColumns: "1.7fr 1fr 1.3fr 2.2fr" }}>
+            <div>Loan</div><div className="text-right">Principal</div><div>Window</div><div>Actions</div>
           </div>
           {d.at_risk_loans.map((l) => (
-            <div key={l.loan_id} className="exp-row" style={{ gridTemplateColumns: "2fr 1.2fr 1.4fr 1.6fr" }}>
+            <div key={l.loan_id} className="exp-row" style={{ gridTemplateColumns: "1.7fr 1fr 1.3fr 2.2fr" }}>
               <div className="mono">#{l.loan_id} · pool {l.pool_key}</div>
               <div className="mono text-right">{rlusd(l.principal)}</div>
               <div>
@@ -117,11 +135,15 @@ export default function VaultDashboard() {
                   <span className="ml-2 text-[11px]" style={{ color: "var(--fg-soft)" }}>+{l.grace_extra_hours}h granted</span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <input className="input mono w-20 py-1" type="number" min="1"
+              <div className="flex flex-wrap items-center gap-2">
+                <input className="input mono w-16 py-1" type="number" min="1"
                   value={hours[l.loan_id] || 1}
                   onChange={(e) => setHours({ ...hours, [l.loan_id]: e.target.value })} />
-                <Button className="py-1.5" onClick={() => extend(l.loan_id)}>Extend</Button>
+                <Button className="py-1.5" variant="ghost" onClick={() => extend(l.loan_id)}>Extend</Button>
+                {l.in_grace && (
+                  <Button className="py-1.5" onClick={() => defaultLoan(l.loan_id)}
+                    style={{ background: "var(--bad)", color: "#fff" }}>Default</Button>
+                )}
               </div>
             </div>
           ))}

@@ -141,6 +141,19 @@ def connect_wallet(
             engine_result=mint.engine_result,
             amount=500000,
         )
+        # Give the lender their own on-chain identity attestation: a distinct
+        # XLS-70 "CoinFish-Lender" credential, separate from their wallet/account.
+        from ..xrpl_service import identity
+        operator = wallet_from_seed(rt.operator_seed)
+        issue = identity.issue_credential(operator, w.address, identity.LENDER_CREDENTIAL_HEX, client)
+        if issue.ok:
+            record_onchain_tx(session, account_id=acct.id, action="credential_issue",
+                              tx_hash=issue.hash, engine_result=issue.engine_result)
+            acc = identity.accept_credential(w, operator.address, identity.LENDER_CREDENTIAL_HEX, client)
+            if acc.ok:
+                record_onchain_tx(session, account_id=acct.id, action="credential_accept",
+                                  tx_hash=acc.hash, engine_result=acc.engine_result)
+                acct.credential_id = acc.hash
     address, seed, balance = w.address, w.seed, _rlusd_balance(w.address)
     set_wallet_connected(session, acct, provider=body.provider, address=address, seed=seed, balance=balance)
     session.commit()

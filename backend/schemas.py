@@ -185,6 +185,10 @@ class GraceExtendIn(BaseModel):
     hours: int
 
 
+class LoanDefaultIn(BaseModel):
+    loan_id: int
+
+
 class AdminDashboardOut(BaseModel):
     fees_collected: float
     total_tvl: float

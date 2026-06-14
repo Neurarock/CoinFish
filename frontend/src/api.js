@@ -62,4 +62,5 @@ export const api = {
   adminDashboard: () => req("GET", "/admin/dashboard"),
   adminAccounts: () => req("GET", "/admin/accounts"),
   extendGrace: (b) => req("POST", "/admin/loans/grace", b),
+  adminDefault: (b) => req("POST", "/admin/loans/default", b),
 };

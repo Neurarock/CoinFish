@@ -13,14 +13,17 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
-from ..db import Account, Deposit, Loan, LoanStatus, Role
+from .. import config
+from ..db import Account, Deposit, FiatLedger, Loan, LoanStatus, Role
 from ..runtime import rt
-from ..schemas import AdminDashboardOut, GraceExtendIn
+from ..schemas import AdminDashboardOut, GraceExtendIn, LoanDefaultIn
 from ..services import (
     collateral_balance,
     collateral_locked,
     explorer_account,
     explorer_tx,
+    record_onchain_tx,
+    require_devnet_transactions,
     require_role,
     session_dep,
 )
@@ -162,3 +165,60 @@ def extend_grace(body: GraceExtendIn, session: Session = Depends(session_dep)) -
     session.add(loan)
     session.commit()
     return {"ok": True, "loan_id": loan.id, "grace_extra_hours": loan.grace_extra_hours}
+
+
+@router.post("/loans/default")
+def operator_default(body: LoanDefaultIn, session: Session = Depends(session_dep)) -> dict:
+    """CoinFish (the loan-broker owner) defaults a past-grace loan.
+
+    Ledger ownership: the on-chain Loan object lives under the LoanBroker, which
+    is owned by the CoinFish operator account, so only the operator can submit
+    LoanManage(tfLoanDefault). The XRPL ledger additionally enforces that the
+    payment is past its due date + grace period, so this only succeeds once the
+    grace window has actually lapsed. On success, first-loss cover is drawn and
+    any residual loss is socialised across the vault's shares on-chain; off-chain
+    we mark the loan defaulted and seize the borrower's pledged fiat collateral.
+    """
+    require_devnet_transactions("Loan default")
+    loan = session.get(Loan, body.loan_id)
+    if not loan:
+        raise HTTPException(404, "loan not found")
+    if loan.status != LoanStatus.ACTIVE:
+        raise HTTPException(400, f"loan is {loan.status.value}")
+    if not loan.xrpl_loan_id:
+        raise HTTPException(400, "loan has no XRPL loan id; cannot default on-chain")
+    default_charge = round(loan.principal * 0.05 + config.FIXED_SERVICE_FEE, 2)
+    from ..xrpl_service import loan as loan_svc
+    from ..xrpl_service.client import get_client, wallet_from_seed
+    client = get_client()
+    res = loan_svc.default_loan(wallet_from_seed(rt.operator_seed), loan.xrpl_loan_id, client)
+    if not res.ok:
+        raise HTTPException(
+            409,
+            "XRPL rejected the default — the loan must be past its due date + grace "
+            f"period before LoanManage(default) is valid: {res.engine_result}",
+        )
+    tx_hash = res.hash
+    record_onchain_tx(
+        session,
+        account_id=loan.account_id,
+        action="loan_default",
+        tx_hash=tx_hash,
+        engine_result=res.engine_result,
+        pool_key=loan.pool_key,
+        loan_id=loan.id,
+        amount=loan.principal,
+    )
+    loan.default_charge = default_charge
+    loan.status = LoanStatus.DEFAULTED
+    rt.pools[loan.pool_key].drawn = max(0.0, rt.pools[loan.pool_key].drawn - loan.principal)
+    rt.fees_collected += default_charge
+    session.add(FiatLedger(account_id=loan.account_id, entry_type="default_charge",
+                           amount=-(loan.principal + default_charge),
+                           reference=f"loan {loan.id} operator default"))
+    session.add(loan)
+    session.commit()
+    return {"ok": True, "status": "defaulted", "loan_id": loan.id,
+            "default_charge": default_charge,
+            "collateral_seized": round(loan.principal + default_charge, 2),
+            "tx_hash": tx_hash, "explorer_url": explorer_tx(tx_hash)}

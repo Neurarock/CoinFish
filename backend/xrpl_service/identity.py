@@ -27,6 +27,33 @@ from .client import TxResult, submit
 BORROWER_CREDENTIAL = "CoinFish-Borrower"
 CREDENTIAL_HEX = str_to_hex(BORROWER_CREDENTIAL)
 
+LENDER_CREDENTIAL = "CoinFish-Lender"
+LENDER_CREDENTIAL_HEX = str_to_hex(LENDER_CREDENTIAL)
+
+
+def issue_credential(
+    operator: Wallet, subject_address: str, credential_hex: str, client: JsonRpcClient
+) -> TxResult:
+    """CoinFish (operator) issues an XLS-70 credential to a subject account."""
+    tx = CredentialCreate(
+        account=operator.address,
+        subject=subject_address,
+        credential_type=credential_hex,
+    )
+    return submit(tx, operator, client=client)
+
+
+def accept_credential(
+    subject: Wallet, operator_address: str, credential_hex: str, client: JsonRpcClient
+) -> TxResult:
+    """Subject account accepts an XLS-70 credential issued by CoinFish."""
+    tx = CredentialAccept(
+        account=subject.address,
+        issuer=operator_address,
+        credential_type=credential_hex,
+    )
+    return submit(tx, subject, client=client)
+
 
 def create_borrower_domain(operator: Wallet, client: JsonRpcClient) -> TxResult:
     """Create the permissioned domain that accepts CoinFish borrower credentials."""

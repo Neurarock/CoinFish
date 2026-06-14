@@ -165,7 +165,9 @@ def dashboard(acct: Account = Depends(lender_only),
         total_dep += principal
         total_shares += principal
     for pool_key, principal in by_pool.items():
-        pool = rt.pools[pool_key]
+        pool = rt.pool(pool_key)
+        if pool is None:                 # defensive: skip any stale/unknown pool key
+            continue
         yield_est = round(principal * pool.base_apr * (1 - 0.03) / 365, 2)  # ~1 day accrual
         accrued += yield_est
         positions.append({

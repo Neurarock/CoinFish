@@ -171,6 +171,40 @@ export default function VaultDashboard() {
         </>
       )}
 
+      {/* per-pool access lists — each vault gates with its own credential + tier */}
+      {acc?.pool_access?.length > 0 && (
+        <>
+          <SectionTitle>Per-pool access lists</SectionTitle>
+          <div className="grid gap-4 md:grid-cols-3">
+            {acc.pool_access.map((pa) => (
+              <div key={pa.pool_key} className="exp-panel p-4">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-sm">{pa.name}</div>
+                  <a href={pa.access_explorer_url} target="_blank" rel="noreferrer"
+                    style={{ color: "var(--accent)", fontSize: "0.7rem", fontWeight: 700 }}>access list ↗</a>
+                </div>
+                <div className="mt-1 text-[11px] mono" style={{ color: "var(--fg-soft)" }}>{pa.credential_type}</div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {pa.eligible_tiers.map((t) => <Pill key={t} tone={t === pa.min_tier ? "accent" : "muted"}>{t}</Pill>)}
+                </div>
+                <div className="exp-head mt-3">Members ({pa.members.length})</div>
+                <div className="mt-1 space-y-1">
+                  {pa.members.length === 0 && <div className="text-[11px]" style={{ color: "var(--fg-soft)" }}>No eligible lenders yet.</div>}
+                  {pa.members.map((m, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span>{m.company_name}</span>
+                      {m.account_explorer_url
+                        ? <a className="mono" href={m.account_explorer_url} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>{m.tier} ↗</a>
+                        : <span className="mono" style={{ color: "var(--fg-soft)" }}>{m.tier}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* participant registry: company detail + on-chain identity + position */}
       {acc?.accounts?.length > 0 && (
         <>

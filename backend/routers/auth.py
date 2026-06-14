@@ -41,6 +41,8 @@ def signup(body: SignupIn, session: Session = Depends(session_dep)) -> TokenOut:
     if existing:
         raise HTTPException(409, "email already registered")
     role = Role(body.role)
+    from .. import config
+    tier = body.lender_tier if body.lender_tier in config.LENDER_TIERS else "retail"
     acct = Account(
         role=role,
         company_name=body.company_name,
@@ -49,6 +51,7 @@ def signup(body: SignupIn, session: Session = Depends(session_dep)) -> TokenOut:
         kyc_status=CheckStatus.PENDING,
         # lenders skip the credit check entirely
         credit_status=CheckStatus.NOT_REQUIRED if role == Role.LENDER else CheckStatus.PENDING,
+        lender_tier=tier if role == Role.LENDER else "retail",
     )
     session.add(acct)
     session.commit()
@@ -143,6 +146,8 @@ def connect_wallet(
         )
         # Give the lender their own on-chain identity attestation: a distinct
         # XLS-70 "CoinFish-Lender" credential, separate from their wallet/account.
+        from xrpl.utils import str_to_hex
+        from .. import config
         from ..xrpl_service import identity
         operator = wallet_from_seed(rt.operator_seed)
         issue = identity.issue_credential(operator, w.address, identity.LENDER_CREDENTIAL_HEX, client)
@@ -154,6 +159,23 @@ def connect_wallet(
                 record_onchain_tx(session, account_id=acct.id, action="credential_accept",
                                   tx_hash=acc.hash, engine_result=acc.engine_result)
                 acct.credential_id = acc.hash
+        # Add the lender to each pool's permissioned domain they're eligible for
+        # by issuing + accepting that pool's credential — REQUIRED before they can
+        # deposit into the pool's private vault.
+        tier = acct.lender_tier or "retail"
+        for pool_key in rt.pools:
+            if not config.lender_can_access(tier, pool_key):
+                continue
+            cred_hex = str_to_hex(config.pool_credential_type(pool_key))
+            pi = identity.issue_credential(operator, w.address, cred_hex, client)
+            if not pi.ok:
+                continue
+            record_onchain_tx(session, account_id=acct.id, action="pool_credential_issue",
+                              tx_hash=pi.hash, engine_result=pi.engine_result, pool_key=pool_key)
+            pa = identity.accept_credential(w, operator.address, cred_hex, client)
+            if pa.ok:
+                record_onchain_tx(session, account_id=acct.id, action="pool_credential_accept",
+                                  tx_hash=pa.hash, engine_result=pa.engine_result, pool_key=pool_key)
     address, seed, balance = w.address, w.seed, _rlusd_balance(w.address)
     set_wallet_connected(session, acct, provider=body.provider, address=address, seed=seed, balance=balance)
     session.commit()

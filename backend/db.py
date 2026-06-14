@@ -88,6 +88,7 @@ class Account(SQLModel, table=True):
     kyc_status: CheckStatus = CheckStatus.PENDING
     credit_status: CheckStatus = CheckStatus.PENDING
     credit_score: int = 0            # filled by the simulated credit check
+    lender_tier: str = "retail"      # accreditation tier gating which pools a lender may enter
     # connected XRPL wallet (a Devnet faucet wallet / simulated external signer)
     xrpl_address: str = ""
     xrpl_seed: str = ""              # Devnet throwaway only
@@ -190,16 +191,29 @@ def get_session() -> Session:
 
 
 def _ensure_account_columns() -> None:
-    """SQLite create_all does not add new columns to an existing demo DB."""
-    if not DB_URL.startswith("sqlite"):
-        return
+    """create_all does not add new columns to an existing table, so backfill the
+    ones added after the first demo DB was created (works on SQLite + Postgres)."""
+    sqlite_adds = {
+        "wallet_provider": "VARCHAR DEFAULT ''",
+        "wallet_rlusd_balance": "FLOAT DEFAULT 0.0",
+        "wallet_connected_at": "DATETIME",
+        "lender_tier": "VARCHAR DEFAULT 'retail'",
+    }
+    pg_adds = {
+        "wallet_provider": "VARCHAR DEFAULT ''",
+        "wallet_rlusd_balance": "DOUBLE PRECISION DEFAULT 0.0",
+        "wallet_connected_at": "TIMESTAMP",
+        "lender_tier": "VARCHAR DEFAULT 'retail'",
+    }
     with engine.begin() as conn:
-        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(account)"))}
-        additions = {
-            "wallet_provider": "VARCHAR DEFAULT ''",
-            "wallet_rlusd_balance": "FLOAT DEFAULT 0.0",
-            "wallet_connected_at": "DATETIME",
-        }
-        for name, ddl in additions.items():
-            if name not in cols:
-                conn.execute(text(f"ALTER TABLE account ADD COLUMN {name} {ddl}"))
+        if engine.dialect.name == "sqlite":
+            cols = {row[1] for row in conn.execute(text("PRAGMA table_info(account)"))}
+            for name, ddl in sqlite_adds.items():
+                if name not in cols:
+                    conn.execute(text(f"ALTER TABLE account ADD COLUMN {name} {ddl}"))
+        else:  # postgres et al. support ADD COLUMN IF NOT EXISTS
+            for name, ddl in pg_adds.items():
+                try:
+                    conn.execute(text(f"ALTER TABLE account ADD COLUMN IF NOT EXISTS {name} {ddl}"))
+                except Exception:
+                    pass

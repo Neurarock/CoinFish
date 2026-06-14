@@ -45,6 +45,8 @@ def main() -> None:
             lines.append(f"COINFISH_POOL_{key}_VAULT_ID={p['vault_id']}")
         if p.get("loan_broker_id"):
             lines.append(f"COINFISH_POOL_{key}_LOAN_BROKER_ID={p['loan_broker_id']}")
+        if p.get("domain_id"):
+            lines.append(f"COINFISH_POOL_{key}_DOMAIN_ID={p['domain_id']}")
 
     print("\n".join(lines))
 

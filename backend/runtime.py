@@ -24,6 +24,10 @@ from .exit_queue import ExitQueue
 
 LIVE_CHAIN = True
 SETUP_PATH = Path(os.getenv("COINFISH_SETUP_JSON", "setup.json"))
+# Committed, non-secret object IDs (vault/broker/issuer/domain) so a deployed
+# backend without the gitignored setup.json still knows the pool IDs. Secret
+# seeds always come from env vars or the local setup.json — never from here.
+PUBLIC_SETUP_PATH = Path(os.getenv("COINFISH_PUBLIC_SETUP_JSON", "setup.public.json"))
 
 
 @dataclass
@@ -36,6 +40,7 @@ class PoolRuntime:
     default_term_hours: int = 24
     vault_id: str = ""
     loan_broker_id: str = ""
+    domain_id: str = ""           # per-pool permissioned domain gating deposits
     # demo-mode mirror of on-chain liquidity so dashboards have live numbers
     tvl: float = 0.0
     drawn: float = 0.0            # principal currently out on loan
@@ -109,20 +114,28 @@ class Runtime:
         return self._operator_address
 
     # -- setup ------------------------------------------------------------
-    def _load_setup(self) -> None:
-        if not SETUP_PATH.exists():
-            data = {}
-        else:
-            data = json.loads(SETUP_PATH.read_text())
-        self.domain_id = data.get("domain_id", self.domain_id)
-        self.operator_seed = data.get("operator_seed", self.operator_seed)
-        self.issuer_seed = data.get("issuer_seed", self.issuer_seed)
-        self.issuer_address = data.get("issuer_address", self.issuer_address)
+    def _apply_setup(self, data: dict) -> None:
+        """Apply object IDs/seeds from a setup dict, only overriding when present
+        (so a committed public file + local setup.json + env vars compose)."""
+        self.domain_id = data.get("domain_id") or self.domain_id
+        self.operator_seed = data.get("operator_seed") or self.operator_seed
+        self.issuer_seed = data.get("issuer_seed") or self.issuer_seed
+        self.issuer_address = data.get("issuer_address") or self.issuer_address
+        self._operator_address = data.get("operator_address") or self._operator_address
         for p in data.get("pools", []):
             pr = self.pools.get(p["key"])
             if pr:
-                pr.vault_id = p.get("vault_id", "")
-                pr.loan_broker_id = p.get("loan_broker_id", "")
+                pr.vault_id = p.get("vault_id") or pr.vault_id
+                pr.loan_broker_id = p.get("loan_broker_id") or pr.loan_broker_id
+                pr.domain_id = p.get("domain_id") or pr.domain_id
+
+    def _load_setup(self) -> None:
+        # base: committed public IDs (no secrets); then the local gitignored
+        # setup.json (full, incl. seeds); then env vars take final precedence.
+        if PUBLIC_SETUP_PATH.exists():
+            self._apply_setup(json.loads(PUBLIC_SETUP_PATH.read_text()))
+        if SETUP_PATH.exists():
+            self._apply_setup(json.loads(SETUP_PATH.read_text()))
         for key, pr in self.pools.items():
             env_key = key.upper().replace("-", "_")
             pr.vault_id = os.getenv(f"COINFISH_POOL_{env_key}_VAULT_ID", pr.vault_id)
@@ -130,6 +143,7 @@ class Runtime:
                 f"COINFISH_POOL_{env_key}_LOAN_BROKER_ID",
                 pr.loan_broker_id,
             )
+            pr.domain_id = os.getenv(f"COINFISH_POOL_{env_key}_DOMAIN_ID", pr.domain_id)
 
     def _seed_demo_liquidity(self) -> None:
         """Give each pool plausible starting numbers so the UI looks alive."""

@@ -346,15 +346,40 @@ def accept_quote(body: AcceptQuoteIn, acct: Account = Depends(borrower_only),
         rt.require_live_ready(pool_key=pool.key, need_broker=True)
     except RuntimeError as exc:
         raise HTTPException(503, f"Devnet live mode is not configured: {exc}") from exc
-    from ..xrpl_service import assets
+    from ..xrpl_service import assets, vault
     from ..xrpl_service import loan as loan_svc
     from ..xrpl_service.client import get_client, wallet_from_seed
     client = get_client()
+
+    # A loan's principal is paid out FROM THE POOL'S VAULT, so the vault must
+    # hold enough idle RLUSD (i.e. a lender must have deposited into this pool).
+    # Pre-check the real on-chain liquidity so we can give a clear reason instead
+    # of a raw tecINSUFFICIENT_FUNDS from LoanSet.
+    try:
+        available, _total = vault.vault_liquidity(pool.vault_id, client)
+    except Exception:
+        available = None
+    if available is not None and available + 1e-6 < q.principal:
+        raise HTTPException(
+            409,
+            f"This pool's vault only has {available:,.2f} RLUSD of lender liquidity, "
+            f"which can't fund a {q.principal:,.2f} RLUSD loan. A lender needs to "
+            f"deposit into the {pool.name} pool first, or borrow a smaller amount.",
+        )
+
     res = loan_svc.originate_loan(
         wallet_from_seed(rt.operator_seed), wallet_from_seed(acct.xrpl_seed),
         pool.loan_broker_id, q.principal, q.interest_rate, q.term_hours, client)
     if not res.ok:
-        raise HTTPException(502, f"LoanSet failed on Devnet: {res.engine_result}")
+        detail = f"LoanSet failed on Devnet: {res.engine_result}"
+        if "INSUFFICIENT_FUNDS" in (res.engine_result or ""):
+            detail = (
+                f"{pool.name} doesn't have enough lender liquidity in its vault to "
+                f"fund this {q.principal:,.2f} RLUSD loan. A lender must deposit RLUSD "
+                f"into this pool before it can lend (the loan is funded from the vault, "
+                f"not from your collateral)."
+            )
+        raise HTTPException(502, detail)
     tx_hash, loan_id = res.hash, (loan_svc.loan_id_from_result(res) or "")
     acct.wallet_rlusd_balance = assets.rlusd_balance(acct.xrpl_address, rt.issuer_address, client)
 

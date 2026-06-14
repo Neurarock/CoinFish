@@ -118,9 +118,12 @@ def accounts(session: Session = Depends(session_dep)) -> dict:
             by_pool: dict[str, float] = {}
             for d in deps:
                 by_pool[d.pool_key] = round(by_pool.get(d.pool_key, 0.0) + d.principal, 2)
+            rec["tier"] = a.lender_tier or "retail"
             rec["lending"] = {
                 "total_deposited": round(sum(d.principal for d in deps), 2),
                 "by_pool": by_pool,
+                "eligible_pools": [k for k in rt.pools
+                                   if config.lender_can_access(a.lender_tier or "retail", k)],
             }
         else:
             coll = collateral_balance(session, a.id)
@@ -149,8 +152,33 @@ def accounts(session: Session = Depends(session_dep)) -> dict:
         # operator account; the explorer renders accounts, not raw objects.
         "permission_list_explorer_url": explorer_account(op),
     }
-    return {"permission": permission, "accounts": out,
-            "lenders": sum(1 for a in rows if a.role == Role.LENDER),
+
+    # Per-pool access list: each pool gates by its own credential + min tier, so
+    # the access list (eligible lenders) differs per pool.
+    lenders = [a for a in rows if a.role == Role.LENDER]
+    pool_access = []
+    for key, pool in rt.pools.items():
+        members = [
+            {"company_name": a.company_name, "tier": a.lender_tier or "retail",
+             "xrpl_address": a.xrpl_address,
+             "account_explorer_url": explorer_account(a.xrpl_address),
+             "credentialed": bool(a.xrpl_address)}
+            for a in lenders
+            if config.lender_can_access(a.lender_tier or "retail", key)
+        ]
+        pool_access.append({
+            "pool_key": key, "name": pool.name,
+            "min_tier": config.pool_min_tier(key),
+            "eligible_tiers": config.pool_allowed_tiers(key),
+            "credential_type": config.pool_credential_type(key),
+            "vault_id": pool.vault_id,
+            "domain_id": pool.domain_id,
+            "access_explorer_url": explorer_account(op),
+            "members": members,
+        })
+
+    return {"permission": permission, "pool_access": pool_access, "accounts": out,
+            "lenders": len(lenders),
             "borrowers": sum(1 for a in rows if a.role == Role.BORROWER)}
 
 

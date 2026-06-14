@@ -79,3 +79,48 @@ POOLS: list[PoolConfig] = [
     PoolConfig("med",  "CoinFish Balanced",     "medium", 0.10, 0.08, 48),
     PoolConfig("high", "CoinFish High-Yield",   "high",   0.05, 0.14, 72),
 ]
+
+
+# --- Per-pool access control (lender profile gating) -------------------------
+# Each pool is permissioned: a lender may only deposit if their accreditation
+# tier meets the pool's minimum. Riskier pools require more sophisticated
+# lenders. Each pool gates with its OWN XLS-70 credential type + domain, so the
+# access list differs per pool. A lender is issued the pool's credential when
+# they first deposit into a pool they're eligible for.
+LENDER_TIERS = ["retail", "professional", "institutional"]   # increasing sophistication
+
+
+@dataclass
+class PoolAccess:
+    min_tier: str            # lowest lender tier allowed into this pool
+    credential_type: str     # per-pool XLS-70 credential subject must hold
+
+
+POOL_ACCESS: dict[str, PoolAccess] = {
+    "low":  PoolAccess("retail",        "CoinFish-Pool-Low"),
+    "med":  PoolAccess("professional",  "CoinFish-Pool-Med"),
+    "high": PoolAccess("institutional", "CoinFish-Pool-High"),
+}
+
+
+def tier_rank(tier: str) -> int:
+    return LENDER_TIERS.index(tier) if tier in LENDER_TIERS else 0
+
+
+def pool_min_tier(pool_key: str) -> str:
+    acc = POOL_ACCESS.get(pool_key)
+    return acc.min_tier if acc else "retail"
+
+
+def pool_credential_type(pool_key: str) -> str:
+    acc = POOL_ACCESS.get(pool_key)
+    return acc.credential_type if acc else ""
+
+
+def pool_allowed_tiers(pool_key: str) -> list[str]:
+    floor = tier_rank(pool_min_tier(pool_key))
+    return [t for t in LENDER_TIERS if tier_rank(t) >= floor]
+
+
+def lender_can_access(tier: str, pool_key: str) -> bool:
+    return tier_rank(tier) >= tier_rank(pool_min_tier(pool_key))

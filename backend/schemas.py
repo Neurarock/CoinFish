@@ -14,6 +14,7 @@ class SignupIn(BaseModel):
     password: str
     contact_name: str = ""
     company_number: str = ""       # e.g. Companies House number (cosmetic for demo)
+    lender_tier: str = "retail"    # retail | professional | institutional (lenders only)
 
 
 class LoginIn(BaseModel):
@@ -29,6 +30,7 @@ class AccountOut(BaseModel):
     kyc_status: str
     credit_status: str
     credit_score: int
+    lender_tier: str = "retail"
     xrpl_address: str
     wallet_provider: str = ""
     wallet_rlusd_balance: float = 0.0
@@ -75,6 +77,9 @@ class PoolOut(BaseModel):
     base_apr: float
     net_apr: float                 # base APR net of management fee
     default_term_hours: int = 24   # pre-filled loan term for this pool
+    min_tier: str = "retail"       # lowest lender tier allowed into this pool
+    eligible_tiers: list[str] = [] # lender tiers permitted to deposit
+    credential_type: str = ""      # per-pool XLS-70 credential gating deposits
     first_loss_buffer: float       # cover_rate_minimum
     tvl: float
     available: float

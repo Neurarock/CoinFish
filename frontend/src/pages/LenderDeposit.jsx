@@ -2,12 +2,15 @@
 // water tank showing how saturated it is (utilisation), and a deposit panel.
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { useAuth } from "../store.jsx";
 import Layout from "../components/Layout.jsx";
 import PoolWater from "../components/PoolWater.jsx";
 import { useTx } from "../components/TxProcessing.jsx";
 import { Button, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
 
 export default function LenderDeposit() {
+  const { account } = useAuth();
+  const tier = account?.lender_tier || "retail";
   const [pools, setPools] = useState([]);
   const [sel, setSel] = useState(null);
   const [amount, setAmount] = useState(10000);
@@ -47,14 +50,21 @@ export default function LenderDeposit() {
 
       <Disclaimer />
 
+      <div className="mb-4 text-sm" style={{ color: "var(--fg-soft)" }}>
+        Your accreditation: <Pill tone="accent">{tier}</Pill> — each pool is permissioned, so
+        you can only fund pools your tier is cleared for.
+      </div>
+
       <div className="mt-6 grid gap-5 md:grid-cols-3">
-        {pools.map((p) => (
+        {pools.map((p) => {
+          const eligible = (p.eligible_tiers || []).includes(tier);
+          return (
           <div key={p.key} className="card p-4"
-            style={{ outline: sel === p.key ? "2px solid var(--accent)" : "none" }}>
+            style={{ outline: sel === p.key ? "2px solid var(--accent)" : "none", opacity: eligible ? 1 : 0.7 }}>
             <div className="flex items-center justify-between">
               <div className="font-bold">{p.name}</div>
-              <Pill tone={p.risk_tier === "low" ? "good" : p.risk_tier === "high" ? "bad" : "warn"}>
-                {p.risk_tier} risk
+              <Pill tone={eligible ? (p.risk_tier === "low" ? "good" : p.risk_tier === "high" ? "bad" : "warn") : "muted"}>
+                {eligible ? `${p.risk_tier} risk` : "locked"}
               </Pill>
             </div>
             <div className="my-3">
@@ -66,6 +76,7 @@ export default function LenderDeposit() {
             <Row k="First-loss buffer" v={pct(p.first_loss_buffer)} />
             <Row k="First-loss capital" v={rlusd(p.first_loss_capital)} />
             <Row k="Idle / available" v={rlusd(p.available)} />
+            <Row k="Min tier" v={p.min_tier} />
             <div className="mt-3">
               <VerifyLink href={p.vault_explorer_url} label="Verify on XRPL" />
               <div className="mt-1 text-[11px]" style={{ color: "var(--fg-soft)" }}>
@@ -81,11 +92,12 @@ export default function LenderDeposit() {
               </div>
             </div>
             <Button variant={sel === p.key ? "primary" : "ghost"} className="mt-3 w-full justify-center"
-              onClick={() => setSel(p.key)}>
-              {sel === p.key ? "Selected" : "Select pool"}
+              disabled={!eligible} onClick={() => eligible && setSel(p.key)}>
+              {!eligible ? `Requires ${p.min_tier} tier` : sel === p.key ? "Selected" : "Select pool"}
             </Button>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {sel && (

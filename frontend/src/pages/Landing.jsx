@@ -21,7 +21,7 @@ export default function Landing() {
   const nav = useNavigate();
   const [role, setRole] = useState("lender");
   const [mode, setMode] = useState("signup");
-  const [form, setForm] = useState({ company_name: "", company_number: "", contact_name: "", email: "", password: "" });
+  const [form, setForm] = useState({ company_name: "", company_number: "", contact_name: "", email: "", password: "", lender_tier: "retail" });
   const [acct, setAcct] = useState(account || null);
   const [wallet, setWallet] = useState(null);
   const [walletChoice, setWalletChoice] = useState("xaman");
@@ -143,6 +143,18 @@ export default function Landing() {
               </div>
               <Field label="Work email" type="email" value={form.email} onChange={set("email")} required />
               <Field label="Password" type="password" value={form.password} onChange={set("password")} required />
+              {role === "lender" && (
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>
+                    Accreditation tier (gates which pools you can fund)
+                  </span>
+                  <select className="input" value={form.lender_tier} onChange={set("lender_tier")}>
+                    <option value="retail">Retail — Conservative pool only</option>
+                    <option value="professional">Professional — Conservative + Balanced</option>
+                    <option value="institutional">Institutional — all pools</option>
+                  </select>
+                </label>
+              )}
               <Button className="w-full justify-center">Create account</Button>
             </form>
           ) : (

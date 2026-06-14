@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
+from .. import config
 from ..db import Account, Deposit, ExitRow, Role
 from ..runtime import rt
 from ..schemas import (
@@ -43,6 +44,14 @@ def deposit(body: DepositIn, acct: Account = Depends(lender_only),
         raise HTTPException(404, "unknown pool")
     if body.amount <= 0:
         raise HTTPException(400, "amount must be positive")
+    # Per-pool access control: a lender may only deposit if their accreditation
+    # tier meets the pool's minimum (riskier pools need sophisticated lenders).
+    if not config.lender_can_access(acct.lender_tier or "retail", pool.key):
+        raise HTTPException(
+            403,
+            f"{pool.name} is restricted to {config.pool_min_tier(pool.key)} "
+            f"tier and above. Your accreditation is '{acct.lender_tier or 'retail'}'.",
+        )
     from ..xrpl_service import assets, vault
     from ..xrpl_service.client import get_client, wallet_from_seed
     try:

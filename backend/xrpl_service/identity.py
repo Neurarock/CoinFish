@@ -66,6 +66,21 @@ def create_borrower_domain(operator: Wallet, client: JsonRpcClient) -> TxResult:
     return submit(tx, operator, client=client)
 
 
+def create_domain(operator: Wallet, credential_type_hex: str, client: JsonRpcClient) -> TxResult:
+    """Create a permissioned domain accepting one CoinFish credential type.
+
+    Used to give each pool its own access domain (e.g. CoinFish-Pool-High), so a
+    private vault behind it only admits lenders who hold that credential.
+    """
+    tx = PermissionedDomainSet(
+        account=operator.address,
+        accepted_credentials=[
+            AcceptedCredential(issuer=operator.address, credential_type=credential_type_hex)
+        ],
+    )
+    return submit(tx, operator, client=client)
+
+
 def issue_borrower_credential(
     operator: Wallet, borrower_address: str, client: JsonRpcClient
 ) -> TxResult:

@@ -107,6 +107,7 @@ def account_out(acct: Account) -> AccountOut:
         kyc_status=acct.kyc_status.value,
         credit_status=acct.credit_status.value,
         credit_score=acct.credit_score,
+        lender_tier=acct.lender_tier or "retail",
         xrpl_address=acct.xrpl_address,
         wallet_provider=acct.wallet_provider,
         wallet_rlusd_balance=round(acct.wallet_rlusd_balance or 0.0, 2),

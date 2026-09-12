@@ -1,21 +1,21 @@
-// Home: login / signup for both roles. Signup collects company details (for show
-// only — no real verification), then the KYC button (+ credit check for
-// borrowers) flips orange->green, then connect wallet, then enter the app.
-// The page re-themes live to match the selected role.
+// Auth mini-frontend: login / signup for both roles. Signup collects company
+// details (for show only — no real verification), then the KYC button (+ credit
+// check for borrowers) flips orange->green, then connect wallet, then enter the
+// app. The page re-themes live to match the selected role. Mounted at /app.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../store.jsx";
-import { api } from "../api.js";
-import { Button, Field, Pill, VerifyLink, rlusd } from "../components/ui.jsx";
-import CheckButton from "../components/CheckButton.jsx";
-import DevnetBadge from "../components/DevnetBadge.jsx";
-import Footer from "../components/Footer.jsx";
-import Logo from "../components/Logo.jsx";
-import { useTx } from "../components/TxProcessing.jsx";
+import { useAuth } from "../../shared/store.jsx";
+import { api } from "../../shared/api.js";
+import { Button, Field, Pill, VerifyLink, rlusd } from "../../shared/components/ui.jsx";
+import CheckButton from "../../shared/components/CheckButton.jsx";
+import DevnetBadge from "../../shared/components/DevnetBadge.jsx";
+import Footer from "../../shared/components/Footer.jsx";
+import Logo from "../../shared/components/Logo.jsx";
+import { useTx } from "../../shared/components/TxProcessing.jsx";
 
 const THEME = { lender: "theme-lender", borrower: "theme-borrower" };
 
-export default function Landing() {
+export default function AuthPage() {
   const { login, patchAccount, account } = useAuth();
   const { track } = useTx();
   const nav = useNavigate();
@@ -96,6 +96,9 @@ export default function Landing() {
           <Logo size={68} to="/" /> CoinFish
         </div>
         <div className="flex items-center gap-3">
+          <a href="/" className="text-sm font-semibold" style={{ color: "var(--fg-soft)" }}>
+            Company site
+          </a>
           <a href="/vault" className="text-sm font-semibold" style={{ color: "var(--fg-soft)" }}>
             CoinFish vault ↗
           </a>

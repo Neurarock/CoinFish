@@ -33,6 +33,11 @@ export default function Footer() {
               Terms of Service
             </button>
             <span className="mx-2">·</span>
+            <a href="/#terms" className="underline decoration-dotted underline-offset-2"
+              style={{ color: "var(--fg-soft)" }}>
+              Full terms
+            </a>
+            <span className="mx-2">·</span>
             <span className="inline-flex items-center gap-1"><Logo size={16} aura={false} /> CoinFish</span>
           </div>
         </div>

@@ -7,10 +7,10 @@
 // Ineligible pools show the reason and a friendly "thank you" card instead.
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../api.js";
-import Layout from "../components/Layout.jsx";
-import { useTx } from "../components/TxProcessing.jsx";
-import { Button, Pill, VerifyLink, rlusd, usd, pct } from "../components/ui.jsx";
+import { api } from "../../shared/api.js";
+import Layout from "../../shared/components/Layout.jsx";
+import { useTx } from "../../shared/components/TxProcessing.jsx";
+import { Button, Pill, VerifyLink, rlusd, usd, pct } from "../../shared/components/ui.jsx";
 
 const QUOTE_WINDOW = 5; // seconds a quote stays live
 

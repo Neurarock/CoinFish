@@ -3,12 +3,12 @@
 // borrower can fund repayments. Per active loan you can repay interest-only,
 // repay ALL early (principal + interest up to the minimum term), or default.
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
-import Layout from "../components/Layout.jsx";
-import TxLedger from "../components/TxLedger.jsx";
-import QrCode from "../components/QrCode.jsx";
-import { useTx } from "../components/TxProcessing.jsx";
-import { Button, Stat, Pill, VerifyLink, IdentityLinks, rlusd, usd, pct } from "../components/ui.jsx";
+import { api } from "../../shared/api.js";
+import Layout from "../../shared/components/Layout.jsx";
+import TxLedger from "../../shared/components/TxLedger.jsx";
+import QrCode from "../../shared/components/QrCode.jsx";
+import { useTx } from "../../shared/components/TxProcessing.jsx";
+import { Button, Stat, Pill, VerifyLink, IdentityLinks, rlusd, usd, pct } from "../../shared/components/ui.jsx";
 
 export default function BorrowerDashboard() {
   const [d, setD] = useState(null);

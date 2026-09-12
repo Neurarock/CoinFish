@@ -4,11 +4,11 @@
 // utilisation, the at-risk loan queue with a grace control, and the live XRPL
 // transaction feed.
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
-import Layout from "../components/Layout.jsx";
-import TxLedger from "../components/TxLedger.jsx";
-import { useTx } from "../components/TxProcessing.jsx";
-import { Button, Pill, VerifyLink, rlusd, usd, pct } from "../components/ui.jsx";
+import { api } from "../../shared/api.js";
+import Layout from "../../shared/components/Layout.jsx";
+import TxLedger from "../../shared/components/TxLedger.jsx";
+import { useTx } from "../../shared/components/TxProcessing.jsx";
+import { Button, Pill, VerifyLink, rlusd, usd, pct } from "../../shared/components/ui.jsx";
 
 const POOL_COLS = "1.5fr .7fr 1.4fr 1fr 1fr 1fr 1fr .7fr";
 

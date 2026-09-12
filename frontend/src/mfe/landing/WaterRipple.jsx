@@ -1,0 +1,251 @@
+// Cursor-driven water heightfield. A low-res simulation is scaled to fill the
+// viewport; mouse motion drops smooth disturbances that ripple outward.
+import { useEffect, useRef } from "react";
+
+export default function WaterRipple() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
+
+    let raf = 0;
+    let running = true;
+    let width = 0;
+    let height = 0;
+    let cols = 0;
+    let rows = 0;
+    let curr;
+    let prev;
+    let img;
+    let offscreen;
+    let offCtx;
+    let pointerX = -1;
+    let pointerY = -1;
+    let lastDropX = -1;
+    let lastDropY = -1;
+    let smoothX = -1;
+    let smoothY = -1;
+    let lastTs = 0;
+
+    // Soft ocean palette (RGBA) sampled into the caustic shading.
+    const deep = [6, 16, 24];
+    const mid = [14, 58, 74];
+    const light = [56, 168, 186];
+    const foam = [186, 230, 236];
+
+    const CELL = 4; // simulation cell size in CSS pixels
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      cols = Math.ceil(width / CELL) + 2;
+      rows = Math.ceil(height / CELL) + 2;
+      curr = new Float32Array(cols * rows);
+      prev = new Float32Array(cols * rows);
+      img = ctx.createImageData(cols, rows);
+      offscreen = document.createElement("canvas");
+      offscreen.width = cols;
+      offscreen.height = rows;
+      offCtx = offscreen.getContext("2d");
+      for (let i = 0; i < cols * rows; i++) {
+        const o = i * 4;
+        img.data[o] = deep[0];
+        img.data[o + 1] = deep[1];
+        img.data[o + 2] = deep[2];
+        img.data[o + 3] = 255;
+      }
+    }
+
+    function drop(x, y, strength = 1) {
+      const cx = Math.floor(x / CELL);
+      const cy = Math.floor(y / CELL);
+      const radius = 3;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx <= 0 || ny <= 0 || nx >= cols - 1 || ny >= rows - 1) continue;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > radius) continue;
+          const falloff = (1 - dist / radius) ** 2;
+          curr[ny * cols + nx] += strength * falloff * 2.8;
+        }
+      }
+    }
+
+    function step() {
+      // Wave equation on a 2D grid with light damping.
+      for (let y = 1; y < rows - 1; y++) {
+        const row = y * cols;
+        for (let x = 1; x < cols - 1; x++) {
+          const i = row + x;
+          const val =
+            (curr[i - 1] + curr[i + 1] + curr[i - cols] + curr[i + cols]) / 2 -
+            prev[i];
+          prev[i] = val * 0.985;
+        }
+      }
+      const swap = curr;
+      curr = prev;
+      prev = swap;
+    }
+
+    function render() {
+      const data = img.data;
+      for (let y = 1; y < rows - 1; y++) {
+        const row = y * cols;
+        for (let x = 1; x < cols - 1; x++) {
+          const i = row + x;
+          const h = curr[i];
+          // Surface normal proxy from neighbouring heights.
+          const nx = curr[i - 1] - curr[i + 1];
+          const ny = curr[i - cols] - curr[i + cols];
+          const shade = Math.max(-1, Math.min(1, nx * 0.35 + ny * 0.2 + h * 0.08));
+
+          // Vertical gradient base (deeper toward bottom of viewport).
+          const gy = y / rows;
+          let r = deep[0] + (mid[0] - deep[0]) * (1 - gy) * 0.85;
+          let g = deep[1] + (mid[1] - deep[1]) * (1 - gy) * 0.85;
+          let b = deep[2] + (mid[2] - deep[2]) * (1 - gy) * 0.85;
+
+          // Caustic highlight where the wave crest rises.
+          const crest = Math.max(0, shade);
+          r += (light[0] - r) * crest * 0.55;
+          g += (light[1] - g) * crest * 0.55;
+          b += (light[2] - b) * crest * 0.55;
+          if (crest > 0.55) {
+            const foamMix = (crest - 0.55) / 0.45;
+            r += (foam[0] - r) * foamMix * 0.35;
+            g += (foam[1] - g) * foamMix * 0.35;
+            b += (foam[2] - b) * foamMix * 0.35;
+          }
+          // Soft trough darkening.
+          const trough = Math.max(0, -shade);
+          r -= trough * 18;
+          g -= trough * 12;
+          b -= trough * 8;
+
+          const o = i * 4;
+          data[o] = r | 0;
+          data[o + 1] = g | 0;
+          data[o + 2] = b | 0;
+          data[o + 3] = 255;
+        }
+      }
+
+      offCtx.putImageData(img, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(offscreen, 0, 0, width, height);
+
+      // Soft vignette so content stays readable.
+      const grd = ctx.createRadialGradient(
+        width * 0.5, height * 0.35, width * 0.1,
+        width * 0.5, height * 0.5, width * 0.85,
+      );
+      grd.addColorStop(0, "rgba(6,16,24,0.05)");
+      grd.addColorStop(1, "rgba(6,16,24,0.55)");
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function frame(ts) {
+      if (!running) return;
+      const dt = Math.min(32, ts - lastTs || 16);
+      lastTs = ts;
+
+      // Ease the disturbance toward the pointer for a liquid follow.
+      if (pointerX >= 0) {
+        if (smoothX < 0) {
+          smoothX = pointerX;
+          smoothY = pointerY;
+        } else {
+          const ease = 1 - Math.exp(-dt * 0.012);
+          smoothX += (pointerX - smoothX) * ease;
+          smoothY += (pointerY - smoothY) * ease;
+        }
+        const moved =
+          Math.hypot(smoothX - lastDropX, smoothY - lastDropY) > 4 ||
+          lastDropX < 0;
+        if (moved) {
+          const speed = Math.min(
+            1.6,
+            Math.hypot(smoothX - lastDropX, smoothY - lastDropY) / 28,
+          );
+          drop(smoothX, smoothY, 0.45 + speed);
+          lastDropX = smoothX;
+          lastDropY = smoothY;
+        }
+      }
+
+      // Idle ambient drip so the surface never feels frozen.
+      if (Math.random() < 0.02) {
+        drop(Math.random() * width, Math.random() * height * 0.7, 0.35);
+      }
+
+      step();
+      render();
+      raf = requestAnimationFrame(frame);
+    }
+
+    function onMove(e) {
+      pointerX = e.clientX;
+      pointerY = e.clientY;
+    }
+    function onLeave() {
+      pointerX = -1;
+      pointerY = -1;
+      lastDropX = -1;
+      lastDropY = -1;
+    }
+    function onClick(e) {
+      drop(e.clientX, e.clientY, 3.2);
+    }
+    function onTouch(e) {
+      const t = e.touches[0];
+      if (!t) return;
+      pointerX = t.clientX;
+      pointerY = t.clientY;
+    }
+
+    resize();
+    // Seed a gentle opening ripple near the brand area.
+    drop(width * 0.35, height * 0.28, 4);
+    drop(width * 0.62, height * 0.42, 2.2);
+    raf = requestAnimationFrame(frame);
+
+    window.addEventListener("resize", resize);
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerleave", onLeave);
+    window.addEventListener("click", onClick);
+    window.addEventListener("touchmove", onTouch, { passive: true });
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerleave", onLeave);
+      window.removeEventListener("click", onClick);
+      window.removeEventListener("touchmove", onTouch);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="landing-ripple"
+      aria-hidden="true"
+    />
+  );
+}

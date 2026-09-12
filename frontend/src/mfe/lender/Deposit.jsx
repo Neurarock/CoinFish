@@ -1,12 +1,12 @@
 // Lender deposit screen: three pools, each with full financial disclosure, a
 // water tank showing how saturated it is (utilisation), and a deposit panel.
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
-import { useAuth } from "../store.jsx";
-import Layout from "../components/Layout.jsx";
-import PoolWater from "../components/PoolWater.jsx";
-import { useTx } from "../components/TxProcessing.jsx";
-import { Button, Pill, VerifyLink, rlusd, pct } from "../components/ui.jsx";
+import { api } from "../../shared/api.js";
+import { useAuth } from "../../shared/store.jsx";
+import Layout from "../../shared/components/Layout.jsx";
+import PoolWater from "../../shared/components/PoolWater.jsx";
+import { useTx } from "../../shared/components/TxProcessing.jsx";
+import { Button, Pill, VerifyLink, rlusd, pct } from "../../shared/components/ui.jsx";
 
 export default function LenderDeposit() {
   const { account } = useAuth();

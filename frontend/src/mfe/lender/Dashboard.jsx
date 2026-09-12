@@ -2,12 +2,12 @@
 // yield, and a withdraw control that either settles immediately or shows the
 // exit-queue status when pool liquidity is short.
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
-import Layout from "../components/Layout.jsx";
-import PoolWater from "../components/PoolWater.jsx";
-import TxLedger from "../components/TxLedger.jsx";
-import { useTx } from "../components/TxProcessing.jsx";
-import { Button, Stat, Pill, VerifyLink, IdentityLinks, rlusd, pct } from "../components/ui.jsx";
+import { api } from "../../shared/api.js";
+import Layout from "../../shared/components/Layout.jsx";
+import PoolWater from "../../shared/components/PoolWater.jsx";
+import TxLedger from "../../shared/components/TxLedger.jsx";
+import { useTx } from "../../shared/components/TxProcessing.jsx";
+import { Button, Stat, Pill, VerifyLink, IdentityLinks, rlusd, pct } from "../../shared/components/ui.jsx";
 
 export default function LenderDashboard() {
   const [d, setD] = useState(null);

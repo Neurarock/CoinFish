@@ -2,10 +2,10 @@
 // simulated UK bank transfer (sort code / account / reference + QR), or withdraw
 // unlocked collateral. Collateral level drives borrowing eligibility.
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
-import Layout from "../components/Layout.jsx";
-import QrCode from "../components/QrCode.jsx";
-import { Button, Stat, gbp } from "../components/ui.jsx";
+import { api } from "../../shared/api.js";
+import Layout from "../../shared/components/Layout.jsx";
+import QrCode from "../../shared/components/QrCode.jsx";
+import { Button, Stat, gbp } from "../../shared/components/ui.jsx";
 
 export default function BorrowerCollateral() {
   const [d, setD] = useState(null);

@@ -54,7 +54,7 @@ export default function Layout({ role, children }) {
             </Link>
           ))}
           {account && (
-            <button onClick={() => { logout(); nav("/"); }}
+            <button onClick={() => { logout(); nav("/app"); }}
               className="ml-2 rounded-full px-3 py-1.5 text-sm font-semibold"
               style={{ color: "var(--fg-soft)" }}>
               Sign out

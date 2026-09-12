@@ -13,7 +13,6 @@ import random
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlmodel import Session, select
 
-from .. import db
 from ..db import Account, CheckStatus, Role
 from ..runtime import rt
 from ..schemas import AccountOut, LoginIn, SignupIn, TokenOut, WalletConnectIn, WalletOut

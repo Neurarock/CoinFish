@@ -1,0 +1,11 @@
+# Ruff — keep CI lint focused on real issues, not style churn.
+[lint]
+select = ["E", "F"]
+ignore = [
+  "E501",  # line length
+  "E741",  # ambiguous name (loan loops use `l`)
+  "E731",  # lambda assignment
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]

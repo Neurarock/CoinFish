@@ -4,7 +4,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
-from .. import config
 from ..db import Loan
 from ..runtime import LIVE_CHAIN, rt
 from ..services import explorer_account, explorer_object, explorer_tx, session_dep

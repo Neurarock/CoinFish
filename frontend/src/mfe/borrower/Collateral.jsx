@@ -75,7 +75,7 @@ export default function BorrowerCollateral() {
                 <Detail k="Reference" v={intent.reference} />
                 <Detail k="Amount" v={gbp(intent.amount)} />
                 <Button className="mt-2 w-full justify-center" onClick={confirmTopup}>
-                  I've sent the transfer
+                  I&apos;ve sent the transfer
                 </Button>
               </div>
             </div>

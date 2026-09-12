@@ -17,7 +17,6 @@ export default function VaultDashboard() {
   const [acc, setAcc] = useState(null);
   const [hours, setHours] = useState({});
   const [txs, setTxs] = useState([]);
-  const [tick, setTick] = useState(0);
   const { track } = useTx();
 
   const load = () => {
@@ -27,7 +26,7 @@ export default function VaultDashboard() {
   };
   useEffect(() => {
     load();
-    const t = setInterval(() => { load(); setTick((n) => n + 1); }, 5000);
+    const t = setInterval(() => { load(); }, 5000);
     return () => clearInterval(t);
   }, []);
 

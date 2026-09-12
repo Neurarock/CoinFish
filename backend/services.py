@@ -15,7 +15,7 @@ from sqlmodel import Session, select
 
 from . import config
 from . import db
-from .db import Account, AuthSession, CheckStatus, FiatLedger, OnChainTx, Role
+from .db import Account, AuthSession, FiatLedger, OnChainTx, Role
 from .runtime import LIVE_CHAIN, rt
 from .schemas import AccountOut
 

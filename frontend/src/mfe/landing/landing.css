@@ -27,6 +27,16 @@
   overflow-x: hidden;
 }
 
+/* Polka-dot Mexican wave (canvas) over the water field */
+.landing-polka {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
 .landing-ripple {
   position: fixed;
   inset: 0;
@@ -40,7 +50,7 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
   will-change: transform, opacity;
 }
@@ -54,7 +64,7 @@
 .landing-page main,
 .landing-footer {
   position: relative;
-  z-index: 2;
+  z-index: 3;
 }
 
 .landing-nav {
@@ -189,8 +199,28 @@
   color: var(--landing-fg);
 }
 
+.landing-tagline-hero {
+  margin: 1.1rem 0 0;
+  max-width: 22ch;
+  font-size: clamp(1.55rem, 3.8vw, 2.35rem);
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+  color: var(--landing-fg);
+  text-wrap: balance;
+}
+
+.landing-accent-word {
+  color: var(--landing-accent);
+}
+
+.landing-tagline .landing-accent-word {
+  /* Match the Devnet badge fill on the cyan band (badge text is black there). */
+  color: #000;
+}
+
 .landing-lede {
-  margin: 1.35rem 0 0;
+  margin: 0.95rem 0 0;
   max-width: 28rem;
   font-size: clamp(1.05rem, 2vw, 1.25rem);
   line-height: 1.45;
@@ -305,11 +335,11 @@
   transform: none;
 }
 
-.landing-faq-item[data-reveal-child] {
+.landing-faq [data-reveal-child] {
   transform: translate3d(-12px, 18px, 0);
 }
 
-.landing-faq-item[data-reveal-child].is-in {
+.landing-faq [data-reveal-child].is-in {
   transform: none;
 }
 
@@ -346,21 +376,12 @@
   text-align: center;
 }
 
-.landing-tagline-eyebrow {
-  margin: 0 0 0.85rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
-}
-
 .landing-tagline-text {
   margin: 0 auto;
-  max-width: 18ch;
-  font-size: clamp(2.1rem, 5.5vw, 3.6rem);
+  max-width: 16ch;
+  font-size: clamp(2.35rem, 6.2vw, 4rem);
   font-weight: 700;
-  line-height: 1.08;
+  line-height: 1.06;
   letter-spacing: -0.035em;
   color: #fff;
   text-wrap: balance;

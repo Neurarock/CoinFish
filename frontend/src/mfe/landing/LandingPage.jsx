@@ -6,6 +6,7 @@ import DevnetBadge from "../../shared/components/DevnetBadge.jsx";
 import { api } from "../../shared/api.js";
 import WaterRipple from "./WaterRipple.jsx";
 import TriangleJump from "./TriangleJump.jsx";
+import PolkaWave from "./PolkaWave.jsx";
 import { Reveal } from "./useReveal.jsx";
 import "./landing.css";
 
@@ -80,6 +81,7 @@ export default function LandingPage() {
   return (
     <div className="landing-page">
       <WaterRipple ref={rippleRef} />
+      <PolkaWave />
       <TriangleJump rippleRef={rippleRef} active={heroInView} />
 
       <header className="landing-nav">
@@ -115,9 +117,13 @@ export default function LandingPage() {
       <main>
         <section className="landing-hero" ref={heroRef}>
           <h1 className="landing-brand-hero">CoinFish</h1>
+          <p className="landing-tagline-hero">
+            <span className="landing-accent-word">Liquidity</span> that moves beneath the{" "}
+            <span className="landing-accent-word">surface</span>
+          </p>
           <p className="landing-lede">
-            Liquidity that moves beneath the surface — fiat collateral, on-chain RLUSD,
-            quiet infrastructure for those who already know.
+            Off-chain collateral instant On-chain RLUSD. Infrastructure for those who already
+            know.
           </p>
           <div className="landing-cta-row">
             <Link to="/app" className="landing-btn landing-btn-primary">
@@ -131,14 +137,12 @@ export default function LandingPage() {
 
         <Reveal as="section" className="landing-tagline reveal-scale" aria-label="Tagline">
           <div className="landing-tagline-inner">
-            <p className="landing-tagline-eyebrow">The quiet pool</p>
             <p className="landing-tagline-text">
-              Beneath the surface,<br />
-              capital finds its depth.
+              <span className="landing-accent-word">Liquidity</span> that moves<br />
+              beneath the <span className="landing-accent-word">surface</span>
             </p>
           </div>
         </Reveal>
-
         <Reveal as="section" id="products" className="landing-section">
           <h2 data-reveal-child>Under the surface</h2>
           <p className="landing-section-lede" data-reveal-child>
@@ -198,23 +202,23 @@ export default function LandingPage() {
             {FAQS.map((item, i) => {
               const open = openFaq === i;
               return (
-                <div
-                  key={item.q}
-                  className={`landing-faq-item${open ? " is-open" : ""}`}
-                  role="listitem"
-                  data-reveal-child
-                >
-                  <button
-                    type="button"
-                    className="landing-faq-q"
-                    aria-expanded={open}
-                    onClick={() => setOpenFaq(open ? -1 : i)}
+                <div key={item.q} data-reveal-child role="presentation">
+                  <div
+                    className={`landing-faq-item${open ? " is-open" : ""}`}
+                    role="listitem"
                   >
-                    <span>{item.q}</span>
-                    <span className="landing-faq-icon" aria-hidden="true" />
-                  </button>
-                  <div className="landing-faq-a" hidden={!open}>
-                    <p>{item.a}</p>
+                    <button
+                      type="button"
+                      className="landing-faq-q"
+                      aria-expanded={open}
+                      onClick={() => setOpenFaq(open ? -1 : i)}
+                    >
+                      <span>{item.q}</span>
+                      <span className="landing-faq-icon" aria-hidden="true" />
+                    </button>
+                    <div className="landing-faq-a" hidden={!open}>
+                      <p>{item.a}</p>
+                    </div>
                   </div>
                 </div>
               );

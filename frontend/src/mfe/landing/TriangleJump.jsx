@@ -3,22 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 
 const JUMPS = [
-  // [fromX%, fromY%, toX%, toY%, peakLift%, durationMs, palette]
-  { from: [0.12, 0.62], to: [0.42, 0.48], peak: 0.22, dur: 1400, hue: 0 },
-  { from: [0.78, 0.58], to: [0.48, 0.40], peak: 0.26, dur: 1500, hue: 1 },
-  { from: [0.28, 0.72], to: [0.68, 0.55], peak: 0.30, dur: 1600, hue: 2 },
-  { from: [0.55, 0.68], to: [0.22, 0.52], peak: 0.24, dur: 1450, hue: 3 },
-  { from: [0.18, 0.45], to: [0.72, 0.62], peak: 0.28, dur: 1550, hue: 4 },
+  // from/to as viewport fractions; size is relative to base (1 = current)
+  { from: [0.12, 0.62], to: [0.42, 0.48], peak: 0.22, dur: 1400, size: 1 },
+  { from: [0.78, 0.58], to: [0.48, 0.40], peak: 0.26, dur: 1500, size: 0.62 },
+  { from: [0.28, 0.72], to: [0.68, 0.55], peak: 0.30, dur: 1600, size: 1 },
+  { from: [0.55, 0.68], to: [0.22, 0.52], peak: 0.24, dur: 1450, size: 0.48 },
+  { from: [0.18, 0.45], to: [0.72, 0.62], peak: 0.28, dur: 1550, size: 0.75 },
 ];
 
-// Complements the deep black + cyan water atmosphere.
-const PALETTES = [
-  { fill: "#5ac8d8" },
-  { fill: "#7dd3c4" },
-  { fill: "#3a9fb0" },
-  { fill: "#a1c4d8" },
-  { fill: "#6ec9b8" },
-];
+const FILL = "#ffffff";
+const BASE_W = 36;
+const BASE_H = 31;
 
 function easeInOut(t) {
   return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
@@ -85,7 +80,7 @@ export default function TriangleJump({ rippleRef, active = true }) {
       const from = [spec.from[0] * w, spec.from[1] * h];
       const to = [spec.to[0] * w, spec.to[1] * h];
       const peak = spec.peak * h;
-      const palette = PALETTES[spec.hue % PALETTES.length];
+      const size = spec.size ?? 1;
 
       splash(from[0], from[1], 3.6);
       scheduleSplash(() => splash(from[0], from[1], 1.4), 80);
@@ -106,7 +101,7 @@ export default function TriangleJump({ rippleRef, active = true }) {
           y: pose.y,
           angle: pose.angle,
           opacity,
-          palette,
+          size,
         });
 
         if (t < 1) {
@@ -140,8 +135,10 @@ export default function TriangleJump({ rippleRef, active = true }) {
 
   if (!active || !frame) return null;
 
-  const { x, y, angle, opacity, palette } = frame;
+  const { x, y, angle, opacity, size } = frame;
   const deg = (angle * 180) / Math.PI;
+  const w = Math.round(BASE_W * size);
+  const h = Math.round(BASE_H * size);
 
   return (
     <div
@@ -152,8 +149,8 @@ export default function TriangleJump({ rippleRef, active = true }) {
         opacity,
       }}
     >
-      <svg width="36" height="31" viewBox="0 0 56 48" className="landing-triangle-svg">
-        <polygon points="28,4 52,44 4,44" fill={palette.fill} />
+      <svg width={w} height={h} viewBox="0 0 56 48" className="landing-triangle-svg">
+        <polygon points="28,4 52,44 4,44" fill={FILL} />
       </svg>
     </div>
   );

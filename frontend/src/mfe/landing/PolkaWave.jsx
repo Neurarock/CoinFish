@@ -33,6 +33,7 @@ export default function PolkaWave() {
     let gap = GAP_DESKTOP;
     let waveSpeed = WAVE_SPEED;
     let waveWidth = WAVE_WIDTH;
+    let intervalScale = 1;
     const dpr = () => Math.min(window.devicePixelRatio || 1, 2);
     const mobileMq = window.matchMedia(MOBILE_MQ);
 
@@ -41,9 +42,11 @@ export default function PolkaWave() {
       h = window.innerHeight;
       const mobile = mobileMq.matches;
       gap = mobile ? GAP_MOBILE : GAP_DESKTOP;
-      // Keep visual wave speed / crest width constant when denser
-      waveSpeed = mobile ? WAVE_SPEED * 2 : WAVE_SPEED;
+      // Denser mobile grid: 2× crest width in columns. Speed was WAVE_SPEED*2 for
+      // visual parity; half that → WAVE_SPEED. Interval between waves is 2×.
+      waveSpeed = WAVE_SPEED;
       waveWidth = mobile ? WAVE_WIDTH * 2 : WAVE_WIDTH;
+      intervalScale = mobile ? 2 : 1;
       const ratio = dpr();
       canvas.width = Math.floor(w * ratio);
       canvas.height = Math.floor(h * ratio);
@@ -57,7 +60,8 @@ export default function PolkaWave() {
     function frame(now) {
       if (!running) return;
       const t = now / 1000;
-      const front = (t * waveSpeed) % (cols + waveWidth * 3) - waveWidth;
+      const cycle = (cols + waveWidth * 3) * intervalScale;
+      const front = (t * waveSpeed) % cycle - waveWidth;
 
       ctx.clearRect(0, 0, w, h);
 

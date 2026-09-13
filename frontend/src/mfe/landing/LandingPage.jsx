@@ -141,10 +141,24 @@ export default function LandingPage() {
           </p>
           <div className="landing-cta-row">
             <Link to="/app" className="landing-btn landing-btn-primary">
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" className="landing-nav-icon landing-cta-icon">
+                <path
+                  fill="currentColor"
+                  d="M16.5 12a3.5 3.5 0 1 0-3.4-4.3L9.7 9.9a3.5 3.5 0 1 0 0 4.2l3.4 2.2a3.5 3.5 0 1 0 .9-1.5l-3.4-2.2a3.6 3.6 0 0 0 0-1.2l3.4-2.2c.4.3.9.5 1.5.5Zm-9 1.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9-6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 9a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"
+                />
+              </svg>
               Launch App
+              <span aria-hidden="true" className="landing-nav-arrow landing-cta-arrow">↗</span>
             </Link>
             <Link to="/partners" className="landing-btn landing-btn-ghost">
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" className="landing-nav-icon landing-cta-icon">
+                <path
+                  fill="currentColor"
+                  d="M16.5 12a3.5 3.5 0 1 0-3.4-4.3L9.7 9.9a3.5 3.5 0 1 0 0 4.2l3.4 2.2a3.5 3.5 0 1 0 .9-1.5l-3.4-2.2a3.6 3.6 0 0 0 0-1.2l3.4-2.2c.4.3.9.5 1.5.5Zm-9 1.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9-6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 9a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"
+                />
+              </svg>
               Partner Portal
+              <span aria-hidden="true" className="landing-nav-arrow landing-cta-arrow">↗</span>
             </Link>
           </div>
         </section>

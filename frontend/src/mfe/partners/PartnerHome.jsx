@@ -17,7 +17,7 @@ export default function PartnerHome() {
       <header className="partners-nav">
         <Link to="/" className="partners-brand">
           <Logo size={40} aura={false} />
-          <span>CoinFish · Partners</span>
+          <span>CoinFish</span>
         </Link>
         <nav className="partners-nav-links">
           <Link to="/app">Launch App</Link>

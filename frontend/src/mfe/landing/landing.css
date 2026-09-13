@@ -838,12 +838,13 @@
 
 @media (max-width: 720px) {
   .landing-nav {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     padding: 1.1rem 1.25rem;
   }
+  /* Mobile: logo + CoinFish only */
   .landing-nav-links {
-    justify-content: flex-start;
+    display: none;
   }
   .landing-hero {
     min-height: calc(100vh - 9rem);

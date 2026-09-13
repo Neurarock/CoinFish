@@ -92,7 +92,7 @@ export default function AuthPage() {
       <div className="flex items-center justify-between gap-4 px-6 py-4 md:px-8">
         <div className="flex items-center gap-3 text-[1.05rem] font-semibold tracking-tight">
           <Logo size={44} to="/" />
-          <span>CoinFish · Launch App</span>
+          <span>CoinFish</span>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1">
           <Link to="/" className="app-nav-link" style={{ color: "var(--fg-soft)" }}>

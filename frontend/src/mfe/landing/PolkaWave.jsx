@@ -1,7 +1,9 @@
 // White polka-dot grid with a stadium-style Mexican wave.
 import { useEffect, useRef } from "react";
 
-const GAP = 26;
+const GAP_DESKTOP = 26;
+const GAP_MOBILE = 13; // 2× denser than desktop
+const MOBILE_MQ = "(max-width: 720px)";
 const DOT_R = 1.05;
 const WAVE_WIDTH = 5.5;
 const WAVE_SPEED = 14; // columns per second
@@ -28,35 +30,44 @@ export default function PolkaWave() {
     let h = 0;
     let cols = 0;
     let rows = 0;
+    let gap = GAP_DESKTOP;
+    let waveSpeed = WAVE_SPEED;
+    let waveWidth = WAVE_WIDTH;
     const dpr = () => Math.min(window.devicePixelRatio || 1, 2);
+    const mobileMq = window.matchMedia(MOBILE_MQ);
 
     function resize() {
       w = window.innerWidth;
       h = window.innerHeight;
+      const mobile = mobileMq.matches;
+      gap = mobile ? GAP_MOBILE : GAP_DESKTOP;
+      // Keep visual wave speed / crest width constant when denser
+      waveSpeed = mobile ? WAVE_SPEED * 2 : WAVE_SPEED;
+      waveWidth = mobile ? WAVE_WIDTH * 2 : WAVE_WIDTH;
       const ratio = dpr();
       canvas.width = Math.floor(w * ratio);
       canvas.height = Math.floor(h * ratio);
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      cols = Math.ceil(w / GAP) + 1;
-      rows = Math.ceil(h / GAP) + 1;
+      cols = Math.ceil(w / gap) + 1;
+      rows = Math.ceil(h / gap) + 1;
     }
 
     function frame(now) {
       if (!running) return;
       const t = now / 1000;
-      const front = (t * WAVE_SPEED) % (cols + WAVE_WIDTH * 3) - WAVE_WIDTH;
+      const front = (t * waveSpeed) % (cols + waveWidth * 3) - waveWidth;
 
       ctx.clearRect(0, 0, w, h);
 
       for (let row = 0; row < rows; row += 1) {
         const rowLag = row * 0.18;
-        const y = GAP / 2 + row * GAP;
+        const y = gap / 2 + row * gap;
         for (let col = 0; col < cols; col += 1) {
-          const x = GAP / 2 + col * GAP;
+          const x = gap / 2 + col * gap;
           const dist = col - (front - rowLag);
-          const rise = Math.max(0, 1 - Math.abs(dist) / WAVE_WIDTH);
+          const rise = Math.max(0, 1 - Math.abs(dist) / waveWidth);
           const lift = rise * rise * (3 - 2 * rise);
           if (lift < SHOW_THRESHOLD) continue;
 

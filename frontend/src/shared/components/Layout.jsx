@@ -1,9 +1,7 @@
 // Applies the role palette (theme-lender / theme-borrower / theme-vault) and
 // renders the top nav. Wrap every authenticated page in this.
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
 import { useAuth } from "../store.jsx";
-import { api } from "../api.js";
 import DevnetBadge from "./DevnetBadge.jsx";
 import Logo from "./Logo.jsx";
 
@@ -28,11 +26,6 @@ export default function Layout({ role, children }) {
   const loc = useLocation();
   const nav = useNavigate();
   const links = NAV[role] || [];
-  const [status, setStatus] = useState(null);
-
-  useEffect(() => {
-    api.runtimeStatus().then(setStatus).catch(() => setStatus(null));
-  }, []);
 
   return (
     <div className={`app-bg ${THEME[role] || ""}`}>
@@ -73,7 +66,7 @@ export default function Layout({ role, children }) {
             </button>
           )}
           <span className="ml-1 hidden sm:inline-flex">
-            <DevnetBadge status={status} />
+            <DevnetBadge />
           </span>
         </nav>
       </header>

@@ -314,12 +314,6 @@ body {
   background: #fff;
   animation: badge-pulse 1.8s ease-out infinite;
 }
-.devnet-badge.muted {
-  background: var(--line);
-  color: var(--fg-soft);
-  animation: none;
-  box-shadow: none;
-}
 
 .tx-scrim {
   position: fixed;

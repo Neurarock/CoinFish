@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Logo from "../../shared/components/Logo.jsx";
 import DevnetBadge from "../../shared/components/DevnetBadge.jsx";
-import { api } from "../../shared/api.js";
 import WaterRipple from "./WaterRipple.jsx";
 import TriangleJump from "./TriangleJump.jsx";
 import PolkaWave from "./PolkaWave.jsx";
@@ -80,14 +79,9 @@ const MARKET_STATS = [
 
 export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState(0);
-  const [status, setStatus] = useState(null);
   const [heroInView, setHeroInView] = useState(true);
   const rippleRef = useRef(null);
   const heroRef = useRef(null);
-
-  useEffect(() => {
-    api.runtimeStatus().then(setStatus).catch(() => setStatus(null));
-  }, []);
 
   useEffect(() => {
     const el = heroRef.current;
@@ -115,7 +109,7 @@ export default function LandingPage() {
           <a href="#explore">Explore</a>
           <a href="#faq">FAQ</a>
           <div className="landing-nav-actions">
-            <DevnetBadge status={status} />
+            <DevnetBadge />
             <Link to="/partners" className="landing-nav-btn landing-nav-btn-partner">
               <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" className="landing-nav-icon">
                 <path

@@ -6,6 +6,7 @@ import DevnetBadge from "../../shared/components/DevnetBadge.jsx";
 import WaterRipple from "./WaterRipple.jsx";
 import TriangleJump from "./TriangleJump.jsx";
 import PolkaWave from "./PolkaWave.jsx";
+import PartnerBadgeFrost from "./PartnerBadgeFrost.jsx";
 import PixelFigure from "./PixelFigure.jsx";
 import { Reveal } from "./useReveal.jsx";
 import { openCookieSettings } from "../../shared/consent/index.js";
@@ -83,6 +84,8 @@ export default function LandingPage() {
   const rippleRef = useRef(null);
   const heroRef = useRef(null);
   const partnerCtaRef = useRef(null);
+  const polkaCanvasRef = useRef(null);
+  const firstScreenRef = useRef(null);
 
   useEffect(() => {
     const el = heroRef.current;
@@ -95,13 +98,34 @@ export default function LandingPage() {
     return () => io.disconnect();
   }, []);
 
+  useEffect(() => {
+    const screen = firstScreenRef.current;
+    if (!screen) return undefined;
+
+    const apply = () => {
+      const h = window.visualViewport?.height ?? window.innerHeight;
+      screen.style.minHeight = `${Math.round(h)}px`;
+    };
+    apply();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", apply);
+    window.addEventListener("resize", apply);
+    window.addEventListener("orientationchange", apply);
+    return () => {
+      vv?.removeEventListener("resize", apply);
+      window.removeEventListener("resize", apply);
+      window.removeEventListener("orientationchange", apply);
+    };
+  }, []);
+
   return (
     <div className="landing-page">
       <WaterRipple ref={rippleRef} />
-      <PolkaWave frostElRef={partnerCtaRef} />
+      <PolkaWave canvasRef={polkaCanvasRef} />
       <TriangleJump rippleRef={rippleRef} active={heroInView} />
 
-      <header className="landing-nav">
+      <div className="landing-first-screen" ref={firstScreenRef}>
+        <header className="landing-nav">
         <Link to="/" className="landing-brand">
           <Logo size={44} aura={false} />
           <span>CoinFish</span>
@@ -129,7 +153,6 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      <main>
         <section className="landing-hero" ref={heroRef}>
           <h1 className="landing-brand-hero">CoinFish</h1>
           <p className="landing-tagline-hero">
@@ -156,18 +179,27 @@ export default function LandingPage() {
               to="/partners"
               className="landing-btn landing-cta-partner"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" className="landing-nav-icon landing-cta-icon">
-                <path
-                  fill="currentColor"
-                  d="M16.5 12a3.5 3.5 0 1 0-3.4-4.3L9.7 9.9a3.5 3.5 0 1 0 0 4.2l3.4 2.2a3.5 3.5 0 1 0 .9-1.5l-3.4-2.2a3.6 3.6 0 0 0 0-1.2l3.4-2.2c.4.3.9.5 1.5.5Zm-9 1.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9-6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 9a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"
-                />
-              </svg>
-              Partner Portal
-              <span aria-hidden="true" className="landing-nav-arrow landing-cta-arrow">↗</span>
+              <PartnerBadgeFrost
+                hostRef={partnerCtaRef}
+                rippleRef={rippleRef}
+                polkaCanvasRef={polkaCanvasRef}
+              />
+              <span className="landing-cta-partner-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" className="landing-nav-icon landing-cta-icon">
+                  <path
+                    fill="currentColor"
+                    d="M16.5 12a3.5 3.5 0 1 0-3.4-4.3L9.7 9.9a3.5 3.5 0 1 0 0 4.2l3.4 2.2a3.5 3.5 0 1 0 .9-1.5l-3.4-2.2a3.6 3.6 0 0 0 0-1.2l3.4-2.2c.4.3.9.5 1.5.5Zm-9 1.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9-6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 9a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"
+                  />
+                </svg>
+                Partner Portal
+                <span aria-hidden="true" className="landing-nav-arrow landing-cta-arrow">↗</span>
+              </span>
             </Link>
           </div>
         </section>
+      </div>
 
+      <main>
         <Reveal as="section" className="landing-stats" aria-label="Market signal">
           <p className="landing-stats-kicker" data-reveal-child>
             TradFi is coming on-chain

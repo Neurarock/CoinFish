@@ -9,6 +9,9 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
     drop(x, y, strength = 1) {
       dropRef.current?.(x, y, strength);
     },
+    getCanvas() {
+      return canvasRef.current;
+    },
   }), []);
 
   useEffect(() => {

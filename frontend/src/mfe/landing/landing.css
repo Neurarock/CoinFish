@@ -58,6 +58,7 @@
   overflow: visible;
 }
 
+.landing-first-screen,
 .landing-nav,
 .landing-page main,
 .landing-footer {
@@ -65,8 +66,17 @@
   z-index: 3;
 }
 
+.landing-first-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
 .landing-nav {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
@@ -182,7 +192,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  min-height: calc(100vh - 5rem);
+  flex: 1 1 auto;
   padding: 2.5rem 2rem 5rem;
   max-width: 48rem;
   /* Opacity-only — transform/filter on ancestors kill backdrop-filter */
@@ -223,11 +233,9 @@
   font-weight: 400;
 }
 
+/* Hero CTAs — mobile only; desktop uses the nav badges */
 .landing-cta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 2rem;
+  display: none;
 }
 
 .landing-btn {
@@ -275,11 +283,54 @@
   border-color: rgba(255, 255, 255, 0.45);
 }
 
-/* Desktop Partner CTA — outline; mobile uses canvas frost under a clear label */
+/* Desktop Partner CTA — outline; mobile frost lives inside the button */
 .landing-cta-partner {
+  position: relative;
+  isolation: isolate;
   color: var(--landing-fg);
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.landing-cta-partner-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+}
+
+.landing-cta-partner-frost {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.landing-cta-partner-frost-blur {
+  position: absolute;
+  inset: -24px;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-filter: blur(10px);
+  filter: blur(10px);
+}
+
+.landing-cta-partner-frost-blur canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.landing-cta-partner-frost::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .landing-cta-partner:hover {
@@ -864,7 +915,13 @@
   .landing-nav-links {
     display: none;
   }
-  /* Hero CTAs: Launch solid; Partner label clear — glass drawn in PolkaWave */
+  /* Hero CTAs replace the hidden nav badges */
+  .landing-cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2rem;
+  }
   .landing-cta-row .landing-btn-primary {
     color: #000;
     background: #f5f5f7;
@@ -876,22 +933,26 @@
     border-color: transparent;
   }
   .landing-cta-row .landing-cta-partner {
+    overflow: hidden;
     color: var(--landing-fg);
     background: transparent;
-    border: 1px solid transparent;
-    transition: color 0.25s ease;
-    transform: none;
-    filter: none;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    transition: color 0.25s ease, border-color 0.25s ease;
   }
   .landing-cta-row .landing-cta-partner:hover,
   .landing-cta-row .landing-cta-partner:active {
     color: #fff;
-    filter: none;
-    transform: none;
     background: transparent;
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+  .landing-cta-partner-frost {
+    display: block;
   }
   .landing-hero {
     animation: none;
+    padding: 2rem 1.25rem 3.5rem;
   }
   .landing-cta-row .landing-cta-icon,
   .landing-cta-row .landing-cta-arrow {
@@ -901,10 +962,6 @@
     opacity: 0.85;
     font-size: 0.85em;
     line-height: 1;
-  }
-  .landing-hero {
-    min-height: calc(100vh - 9rem);
-    padding: 2rem 1.25rem 3.5rem;
   }
   .landing-stats {
     padding-left: 1.25rem;

@@ -15,7 +15,7 @@ function MfeFallback() {
   return (
     <div className="app-bg flex min-h-screen items-center justify-center"
       style={{
-        background: "#000",
+        background: "#061018",
         color: "#a1a1a6",
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif',
       }}>

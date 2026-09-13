@@ -6,13 +6,13 @@
   --landing-line: rgba(255, 255, 255, 0.12);
   --landing-accent: #5ac8d8;
   --landing-accent-2: #7dd3c4;
-  --landing-ink: #000000;
+  --landing-ink: #061018;
   --landing-panel: #111113;
   --accent: #5ac8d8;
   --accent-2: #7dd3c4;
   --fg: #f5f5f7;
   --fg-soft: #a1a1a6;
-  --bg: #000000;
+  --bg: #061018;
   --bg-soft: #111113;
   --line: rgba(255, 255, 255, 0.12);
   --landing-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
@@ -24,6 +24,12 @@
   font-family: var(--landing-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html:has(.landing-page),
+html:has(.landing-page) body,
+html:has(.landing-page) #root {
+  background: var(--landing-ink, #061018);
 }
 
 .landing-polka {
@@ -42,6 +48,7 @@
   height: 100%;
   z-index: 1;
   pointer-events: none;
+  background: #061018;
 }
 
 .landing-triangle {

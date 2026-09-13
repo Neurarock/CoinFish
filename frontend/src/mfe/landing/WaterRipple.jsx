@@ -17,7 +17,7 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: true });
+    const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
 
     let raf = 0;
@@ -40,7 +40,6 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
     let lastTs = 0;
 
     const deep = [6, 16, 24];
-    const mid = [14, 58, 74];
     const light = [56, 168, 186];
     const foam = [186, 230, 236];
 
@@ -48,13 +47,16 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
 
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = window.innerWidth;
-      height = window.innerHeight;
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
+      const box = canvas.getBoundingClientRect();
+      width = box.width || window.innerWidth;
+      height = box.height || window.innerHeight;
+      canvas.width = Math.ceil(width * dpr);
+      canvas.height = Math.ceil(height * dpr);
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = `rgb(${deep[0]},${deep[1]},${deep[2]})`;
+      ctx.fillRect(0, 0, width, height);
 
       cols = Math.ceil(width / CELL) + 2;
       rows = Math.ceil(height / CELL) + 2;
@@ -112,36 +114,37 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
 
     function render() {
       const data = img.data;
-      for (let y = 1; y < rows - 1; y++) {
+      for (let y = 0; y < rows; y++) {
         const row = y * cols;
-        for (let x = 1; x < cols - 1; x++) {
+        for (let x = 0; x < cols; x++) {
           const i = row + x;
-          const h = curr[i];
-          const nx = curr[i - 1] - curr[i + 1];
-          const ny = curr[i - cols] - curr[i + cols];
-          const shade = Math.max(-1, Math.min(1, nx * 0.35 + ny * 0.2 + h * 0.08));
-
-          const gy = y / rows;
-          let r = deep[0] + (mid[0] - deep[0]) * (1 - gy) * 0.85;
-          let g = deep[1] + (mid[1] - deep[1]) * (1 - gy) * 0.85;
-          let b = deep[2] + (mid[2] - deep[2]) * (1 - gy) * 0.85;
-
-          const crest = Math.max(0, shade);
-          r += (light[0] - r) * crest * 0.55;
-          g += (light[1] - g) * crest * 0.55;
-          b += (light[2] - b) * crest * 0.55;
-          if (crest > 0.55) {
-            const foamMix = (crest - 0.55) / 0.45;
-            r += (foam[0] - r) * foamMix * 0.35;
-            g += (foam[1] - g) * foamMix * 0.35;
-            b += (foam[2] - b) * foamMix * 0.35;
-          }
-          const trough = Math.max(0, -shade);
-          r -= trough * 18;
-          g -= trough * 12;
-          b -= trough * 8;
-
           const o = i * 4;
+          let r = deep[0];
+          let g = deep[1];
+          let b = deep[2];
+
+          if (x > 0 && y > 0 && x < cols - 1 && y < rows - 1) {
+            const h = curr[i];
+            const nx = curr[i - 1] - curr[i + 1];
+            const ny = curr[i - cols] - curr[i + cols];
+            const shade = Math.max(-1, Math.min(1, nx * 0.35 + ny * 0.2 + h * 0.08));
+
+            const crest = Math.max(0, shade);
+            r += (light[0] - r) * crest * 0.55;
+            g += (light[1] - g) * crest * 0.55;
+            b += (light[2] - b) * crest * 0.55;
+            if (crest > 0.55) {
+              const foamMix = (crest - 0.55) / 0.45;
+              r += (foam[0] - r) * foamMix * 0.35;
+              g += (foam[1] - g) * foamMix * 0.35;
+              b += (foam[2] - b) * foamMix * 0.35;
+            }
+            const trough = Math.max(0, -shade);
+            r -= trough * 18;
+            g -= trough * 12;
+            b -= trough * 8;
+          }
+
           data[o] = r | 0;
           data[o + 1] = g | 0;
           data[o + 2] = b | 0;
@@ -150,18 +153,10 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
       }
 
       offCtx.putImageData(img, 0, 0);
-      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = `rgb(${deep[0]},${deep[1]},${deep[2]})`;
+      ctx.fillRect(0, 0, width, height);
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(offscreen, 0, 0, width, height);
-
-      const grd = ctx.createRadialGradient(
-        width * 0.5, height * 0.35, width * 0.1,
-        width * 0.5, height * 0.5, width * 0.85,
-      );
-      grd.addColorStop(0, "rgba(6,16,24,0.05)");
-      grd.addColorStop(1, "rgba(6,16,24,0.55)");
-      ctx.fillStyle = grd;
-      ctx.fillRect(0, 0, width, height);
     }
 
     function frame(ts) {

@@ -2,6 +2,7 @@
 import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Guard from "./Guard.jsx";
+import { CookieConsent } from "../shared/consent/index.js";
 
 const LandingMFE = lazy(() => import("../mfe/landing/index.jsx"));
 const AuthMFE = lazy(() => import("../mfe/auth/index.jsx"));
@@ -25,20 +26,23 @@ function MfeFallback() {
 
 export default function App() {
   return (
-    <Suspense fallback={<MfeFallback />}>
-      <Routes>
-        <Route path="/" element={<LandingMFE />} />
-        <Route path="/app" element={<AuthMFE />} />
-        <Route path="/partners/*" element={<PartnersMFE />} />
+    <>
+      <Suspense fallback={<MfeFallback />}>
+        <Routes>
+          <Route path="/" element={<LandingMFE />} />
+          <Route path="/app" element={<AuthMFE />} />
+          <Route path="/partners/*" element={<PartnersMFE />} />
 
-        <Route path="/lender/*" element={<Guard role="lender"><LenderMFE /></Guard>} />
-        <Route path="/borrower/*" element={<Guard role="borrower"><BorrowerMFE /></Guard>} />
+          <Route path="/lender/*" element={<Guard role="lender"><LenderMFE /></Guard>} />
+          <Route path="/borrower/*" element={<Guard role="borrower"><BorrowerMFE /></Guard>} />
 
-        {/* Vault dashboard is open in the demo (no admin login). */}
-        <Route path="/vault" element={<VaultMFE />} />
+          {/* Vault dashboard is open in the demo (no admin login). */}
+          <Route path="/vault" element={<VaultMFE />} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+      <CookieConsent />
+    </>
   );
 }

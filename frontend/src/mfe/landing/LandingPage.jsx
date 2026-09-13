@@ -7,25 +7,29 @@ import { api } from "../../shared/api.js";
 import WaterRipple from "./WaterRipple.jsx";
 import TriangleJump from "./TriangleJump.jsx";
 import PolkaWave from "./PolkaWave.jsx";
+import PixelFigure from "./PixelFigure.jsx";
 import { Reveal } from "./useReveal.jsx";
+import { openCookieSettings } from "../../shared/consent/index.js";
 import "./landing.css";
 
-const USE_CASES = [
+const PILLARS = [
   {
-    title: "Treasury yield",
-    body: "Park idle RLUSD in risk-tiered pools. See utilisation in real time. Exit through a clear queue — not a black box.",
+    id: "product",
+    title: "Product",
+    body: "Risk-tiered pools, off-chain collateral, and on-ledger RLUSD — lend, borrow, and operate from one surface.",
+    to: "/app",
   },
   {
-    title: "Working capital",
-    body: "Fiat-rich operators post collateral off-chain and draw on-ledger liquidity when settlement windows tighten.",
+    id: "customer",
+    title: "Customer",
+    body: "Built for treasury desks, fiat-rich operators, and partners who need quiet liquidity rails — not a retail casino.",
+    to: "/partners",
   },
   {
-    title: "Platform rails",
-    body: "Partners embed CoinFish liquidity behind their own brand — keys, usage, and commissions via the Partner Portal.",
-  },
-  {
-    title: "Operator oversight",
-    body: "The vault surfaces solvency, fees, and loans in grace so risk sits in one calm control room.",
+    id: "governance",
+    title: "Governance",
+    body: "Institutional-grade compliance: KYC / AML pathways, pool disclosures, and on-chain verifiability on XRPL Devnet.",
+    to: "#pending-governance",
   },
 ];
 
@@ -53,6 +57,24 @@ const FAQS = [
   {
     q: "Is CoinFish a regulated bank?",
     a: "Not currently. CoinFish is not a licensed bank, payment institution, or investment firm. Legal entity details are under works.",
+  },
+];
+
+const MARKET_STATS = [
+  {
+    figure: "$13T",
+    label: "JPMorgan Chase",
+    body: "Projects a $13 trillion TradFi liquidity onboarded onto crypto rails by 2030.",
+  },
+  {
+    figure: "5–10%",
+    label: "Boutique & regional firms",
+    body: "Broker-dealers and smaller traditional market makers in regional equities or commodities — most lack capital or approval for digital-asset desks.",
+  },
+  {
+    figure: "<5%",
+    label: "Global investment banks",
+    body: "Institutions like Citadel Securities, Virtu, and Morgan Stanley may touch crypto derivatives or OTC — but regulation limits direct on-chain liquidity.",
   },
 ];
 
@@ -90,10 +112,8 @@ export default function LandingPage() {
           <span>CoinFish</span>
         </Link>
         <nav className="landing-nav-links">
-          <a href="#products">Products</a>
-          <a href="#use-cases">Use cases</a>
+          <a href="#explore">Explore</a>
           <a href="#faq">FAQ</a>
-          <a href="#trust">Trust</a>
           <div className="landing-nav-actions">
             <DevnetBadge status={status} />
             <Link to="/partners" className="landing-nav-btn landing-nav-btn-partner">
@@ -135,63 +155,46 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <Reveal as="section" className="landing-tagline reveal-scale" aria-label="Tagline">
-          <div className="landing-tagline-inner">
-            <p className="landing-tagline-text">
-              <span className="landing-accent-word">Liquidity</span> that moves<br />
-              beneath the <span className="landing-accent-word">surface</span>
-            </p>
-          </div>
-        </Reveal>
-        <Reveal as="section" id="products" className="landing-section">
-          <h2 data-reveal-child>Under the surface</h2>
-          <p className="landing-section-lede" data-reveal-child>
-            Three coordinated worlds. One risk engine. Built for the XRP Ledger.
+        <Reveal as="section" className="landing-stats" aria-label="Market signal">
+          <p className="landing-stats-kicker" data-reveal-child>
+            TradFi is coming on-chain
           </p>
-          <ul className="landing-product-list">
-            <li data-reveal-child>
-              <strong>Lend</strong>
-              <span>Supply RLUSD into risk-tiered pools. Watch utilisation. Exit when you choose.</span>
-            </li>
-            <li data-reveal-child>
-              <strong>Borrow</strong>
-              <span>Post fiat off-chain. Draw stablecoin on-ledger. Quotes that refresh in seconds.</span>
-            </li>
-            <li data-reveal-child>
-              <strong>Vault</strong>
-              <span>Operator view — solvency, fees, loans in grace. The control room beneath.</span>
-            </li>
-          </ul>
-        </Reveal>
-
-        <Reveal as="section" id="use-cases" className="landing-section landing-section-wide">
-          <h2 data-reveal-child>Use cases</h2>
-          <p className="landing-section-lede" data-reveal-child>
-            Where CoinFish fits — from treasury desks to platforms that need liquidity rails.
+          <p className="landing-stats-lede" data-reveal-child>
+            A massive market to bridge — not only direct onboarding and offboarding, but
+            credit-based liquidity for institutions that cannot sit fully on-ledger yet.
           </p>
-          <div className="landing-usecases">
-            {USE_CASES.map((item, i) => (
-              <article key={item.title} className="landing-usecase" data-reveal-child>
-                <span className="landing-usecase-num">{String(i + 1).padStart(2, "0")}</span>
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
+          <div className="landing-stats-row">
+            {MARKET_STATS.map((stat) => (
+              <article key={stat.label} className="landing-stat" data-reveal-child>
+                <PixelFigure value={stat.figure} />
+                <h3>{stat.label}</h3>
+                <p>{stat.body}</p>
               </article>
             ))}
           </div>
         </Reveal>
 
-        <Reveal as="section" id="partners" className="landing-section">
-          <h2 data-reveal-child>Partner programme</h2>
-          <p className="landing-section-lede" data-reveal-child>
-            Integrators, platforms, and institutions — access keys, usage, and commission
-            tooling. The portal is opening; credentials are placeholder for this demo.
+        <section id="explore" className="landing-section landing-section-wide">
+          <h2>Explore</h2>
+          <p className="landing-section-lede">
+            Product, customer, and governance — three doors into the same quiet pool.
           </p>
-          <div className="landing-cta-row" data-reveal-child>
-            <Link to="/partners" className="landing-btn landing-btn-ghost">
-              Enter Partner Portal
-            </Link>
+          <div className="landing-pillars">
+            {PILLARS.map((item) => {
+              const Tag = item.to.startsWith("/") ? Link : "a";
+              const linkProps = item.to.startsWith("/")
+                ? { to: item.to }
+                : { href: item.to };
+              return (
+                <Tag key={item.id} className="landing-pillar" {...linkProps}>
+                  <span className="landing-pillar-arrow" aria-hidden="true">↗</span>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </Tag>
+              );
+            })}
           </div>
-        </Reveal>
+        </section>
 
         <Reveal as="section" id="faq" className="landing-section landing-section-wide">
           <h2 data-reveal-child>Frequently asked questions</h2>
@@ -225,60 +228,99 @@ export default function LandingPage() {
             })}
           </div>
         </Reveal>
-
-        <Reveal as="section" id="trust" className="landing-section">
-          <h2 data-reveal-child>Trust</h2>
-          <p className="landing-section-lede" data-reveal-child>
-            Designed toward institutional controls — not yet a live regulated service.
-          </p>
-          <ul className="landing-trust-list">
-            <li data-reveal-child>KYC / AML pathways and credit checks in the Launch App demo</li>
-            <li data-reveal-child>Pool risk disclosures before capital is committed</li>
-            <li data-reveal-child>On-chain verifiability via XRPL Devnet explorer links</li>
-            <li data-reveal-child>Demo assets only — no real funds, no monetary value</li>
-          </ul>
-        </Reveal>
-
-        <Reveal as="section" id="terms" className="landing-section">
-          <h2 data-reveal-child>Terms</h2>
-          <p className="landing-section-lede" data-reveal-child>
-            Draft terms for demonstration. Final contracts follow incorporation.
-          </p>
-          <div className="landing-terms" data-reveal-child>
-            <p>
-              <strong>Demonstration only.</strong> CoinFish is not a licensed bank or
-              investment firm. Nothing here is an offer to lend, borrow, or invest.
-            </p>
-            <p>
-              <strong>No real funds.</strong> Pools and RLUSD run on XRPL Devnet with
-              throwaway test assets. Use at your own discretion.
-            </p>
-            <p>
-              <strong>Risk.</strong> Pool lending involves capital at risk, variable yield,
-              and exit queues. First-loss buffers do not eliminate loss.
-            </p>
-          </div>
-        </Reveal>
-
-        <section className="landing-section landing-section-last">
-          <p className="landing-footnote">
-            CoinFish Ltd (working title) · United Kingdom · registration under way ·
-            Team 5 for UK Finnovator · Ripple Track @ 2026 · hello@coinfish.finance (placeholder)
-          </p>
-        </section>
       </main>
 
+      <div className="landing-social" aria-label="Social">
+        <a
+          className="landing-social-link"
+          href="#pending-linkedin"
+          title="LinkedIn — link pending"
+          aria-label="LinkedIn (link pending)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM.24 8.34h4.52V24H.24V8.34zM8.34 8.34h4.33v2.13h.06c.6-1.14 2.08-2.34 4.28-2.34 4.58 0 5.42 3.01 5.42 6.93V24h-4.52v-7.75c0-1.85-.03-4.22-2.57-4.22-2.57 0-2.96 2.01-2.96 4.09V24H8.34V8.34z"
+            />
+          </svg>
+        </a>
+        <a
+          className="landing-social-link"
+          href="#pending-telegram"
+          title="Telegram — link pending"
+          aria-label="Telegram (link pending)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M11.94 0C5.34 0 0 5.34 0 11.94c0 6.6 5.34 11.94 11.94 11.94 6.6 0 11.94-5.34 11.94-11.94C23.88 5.34 18.54 0 11.94 0zm5.52 8.16-1.86 8.76c-.12.66-.54.82-1.08.51l-3-2.22-1.44 1.38c-.18.18-.3.3-.6.3l.24-3.36 6.12-5.52c.24-.24-.06-.36-.42-.12l-7.56 4.74-3.24-1.02c-.72-.24-.72-.72.12-1.02l12.66-4.86c.6-.24 1.14.12 1.02.87z"
+            />
+          </svg>
+        </a>
+        <a
+          className="landing-social-link"
+          href="#pending-x"
+          title="X — link pending"
+          aria-label="X (link pending)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M18.24 2H21.5l-7.16 8.19L22.7 22h-6.59l-5.16-6.75L5.1 22H1.82l7.66-8.76L1.3 2h6.76l4.66 6.18L18.24 2zm-1.16 18h1.82L7.04 3.9H5.1L17.08 20z"
+            />
+          </svg>
+        </a>
+        <a
+          className="landing-social-link"
+          href="#pending-youtube"
+          title="YouTube — link pending"
+          aria-label="YouTube (link pending)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M23.5 6.2a3.02 3.02 0 0 0-2.12-2.14C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.38.46A3.02 3.02 0 0 0 .5 6.2 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.8 3.02 3.02 0 0 0 2.12 2.14C4.5 20.4 12 20.4 12 20.4s7.5 0 9.38-.46a3.02 3.02 0 0 0 2.12-2.14A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.8zM9.6 15.6V8.4L15.8 12 9.6 15.6z"
+            />
+          </svg>
+        </a>
+      </div>
+
       <footer className="landing-footer">
-        <div>
-          <span className="landing-footer-brand">CoinFish</span>
-          <span> · Beneath the surface</span>
+        <div className="landing-footer-top">
+          <div>
+            <span className="landing-footer-brand">CoinFish</span>
+            <span> · Beneath the surface</span>
+          </div>
+          <div className="landing-footer-links">
+            <a href="#faq">FAQ</a>
+            <a href="#explore">Explore</a>
+            <a href="#pending-privacy">Privacy Policy</a>
+            <Link to="/partners">Partners</Link>
+            <Link to="/app">Launch App</Link>
+          </div>
         </div>
-        <div className="landing-footer-links">
-          <a href="#faq">FAQ</a>
-          <a href="#terms">Terms</a>
-          <Link to="/partners">Partners</Link>
-          <Link to="/app">Launch App</Link>
-          <Link to="/vault">Vault</Link>
+        <div className="landing-footer-bottom">
+          <p className="landing-footer-fineprint">
+            Demonstration only. Not a licensed bank or investment firm; nothing here is an offer
+            to lend, borrow, or invest. Pools and RLUSD run on XRPL Devnet with test assets — no
+            real funds. Pool lending involves capital at risk, variable yield, and exit queues;
+            first-loss buffers do not eliminate loss. Draft terms for demonstration; final
+            contracts follow incorporation. CoinFish Ltd (working title) · United Kingdom ·
+            registration under way · Team 5 for UK Finnovator · Ripple Track @ 2026 ·
+            hello@coinfish.finance (placeholder)
+          </p>
+          <div className="landing-footer-legal">
+            <a
+              href="#pending-cookies"
+              onClick={(e) => {
+                e.preventDefault();
+                openCookieSettings();
+              }}
+            >
+              Cookies Policy
+            </a>
+            <a href="#pending-modern-slavery">Modern Slavery Statement</a>
+          </div>
         </div>
       </footer>
     </div>

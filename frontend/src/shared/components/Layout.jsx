@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../store.jsx";
 import { api } from "../api.js";
 import DevnetBadge from "./DevnetBadge.jsx";
-import Footer from "./Footer.jsx";
 import Logo from "./Logo.jsx";
 
 const THEME = { lender: "theme-lender", borrower: "theme-borrower", admin: "theme-vault" };
@@ -79,7 +78,6 @@ export default function Layout({ role, children }) {
         </nav>
       </header>
       <main className="mx-auto max-w-6xl px-6 py-8 md:px-8">{children}</main>
-      <Footer />
     </div>
   );
 }

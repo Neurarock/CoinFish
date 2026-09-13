@@ -8,7 +8,6 @@ import { api } from "../../shared/api.js";
 import { Button, Field, Pill, VerifyLink, rlusd } from "../../shared/components/ui.jsx";
 import CheckButton from "../../shared/components/CheckButton.jsx";
 import DevnetBadge from "../../shared/components/DevnetBadge.jsx";
-import Footer from "../../shared/components/Footer.jsx";
 import Logo from "../../shared/components/Logo.jsx";
 import { useTx } from "../../shared/components/TxProcessing.jsx";
 
@@ -191,7 +190,6 @@ export default function AuthPage() {
           {err && <div className="mt-3 text-sm" style={{ color: "var(--bad)" }}>{err}</div>}
         </div>
       </div>
-      <Footer />
     </div>
   );
 

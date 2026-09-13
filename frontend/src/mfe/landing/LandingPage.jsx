@@ -82,6 +82,7 @@ export default function LandingPage() {
   const [heroInView, setHeroInView] = useState(true);
   const rippleRef = useRef(null);
   const heroRef = useRef(null);
+  const partnerCtaRef = useRef(null);
 
   useEffect(() => {
     const el = heroRef.current;
@@ -97,7 +98,7 @@ export default function LandingPage() {
   return (
     <div className="landing-page">
       <WaterRipple ref={rippleRef} />
-      <PolkaWave />
+      <PolkaWave frostElRef={partnerCtaRef} />
       <TriangleJump rippleRef={rippleRef} active={heroInView} />
 
       <header className="landing-nav">
@@ -150,7 +151,11 @@ export default function LandingPage() {
               Launch App
               <span aria-hidden="true" className="landing-nav-arrow landing-cta-arrow">↗</span>
             </Link>
-            <Link to="/partners" className="landing-btn landing-btn-ghost">
+            <Link
+              ref={partnerCtaRef}
+              to="/partners"
+              className="landing-btn landing-cta-partner"
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" className="landing-nav-icon landing-cta-icon">
                 <path
                   fill="currentColor"

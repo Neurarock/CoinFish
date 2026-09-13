@@ -40,6 +40,7 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
     let lastTs = 0;
 
     const deep = [6, 16, 24];
+    const mid = [14, 58, 74];
     const light = [56, 168, 186];
     const foam = [186, 230, 236];
 
@@ -114,14 +115,19 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
 
     function render() {
       const data = img.data;
+      const fadeSpan = Math.max(1, rows - 1);
       for (let y = 0; y < rows; y++) {
         const row = y * cols;
+        const lift = (1 - y / fadeSpan) * 0.85;
+        const baseR = deep[0] + (mid[0] - deep[0]) * lift;
+        const baseG = deep[1] + (mid[1] - deep[1]) * lift;
+        const baseB = deep[2] + (mid[2] - deep[2]) * lift;
         for (let x = 0; x < cols; x++) {
           const i = row + x;
           const o = i * 4;
-          let r = deep[0];
-          let g = deep[1];
-          let b = deep[2];
+          let r = baseR;
+          let g = baseG;
+          let b = baseB;
 
           if (x > 0 && y > 0 && x < cols - 1 && y < rows - 1) {
             const h = curr[i];

@@ -1,9 +1,9 @@
-"""CoinFish FastAPI app entrypoint.
+"""CoinFish FastAPI app entrypoint (product BFF microservice).
 
 Run (from the CoinFish/ root):
-    pip install -r backend/requirements.txt
-    python3 -m backend.scripts.bootstrap_devnet
-    uvicorn backend.main:app --reload
+    uv sync --all-packages
+    uv run python -m backend.scripts.bootstrap_devnet
+    uv run uvicorn backend.main:app --reload
 
 Mounts the role routers (auth, pools, lenders, borrowers, loans, admin). The
 chain service layer (xrpl_service) submits frontend-driven wallet/vault/loan

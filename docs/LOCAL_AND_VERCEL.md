@@ -8,12 +8,11 @@ CoinFish is configured as one deployable project:
 
 ## Local Setup
 
-Install Python dependencies:
+Install Python dependencies with **uv** (React UI stays on npm):
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r backend/requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync --all-packages
 ```
 
 Install frontend dependencies:
@@ -27,7 +26,7 @@ cd ..
 Run both local servers against XRPL Devnet:
 
 ```bash
-python3 -m backend.scripts.bootstrap_devnet
+uv run python -m backend.scripts.bootstrap_devnet
 # save the printed JSON as setup.json
 npm run dev:devnet
 ```
@@ -36,6 +35,7 @@ URLs:
 
 - Frontend: `http://127.0.0.1:5173`
 - API: `http://127.0.0.1:8000`
+- DB API: `http://127.0.0.1:8001`
 
 The Vite dev server proxies `/api/*` to FastAPI and strips the `/api` prefix, so
 the browser uses the same API paths it will use on Vercel. The app header must
@@ -54,9 +54,9 @@ npm run test:local
 
 This runs:
 
-- `python3 -m pytest backend/tests`
+- `uv run pytest backend/tests` (+ service health + db tests via scripts)
 - `cd frontend && npm run build`
-- `python3 scripts/smoke_api.py`
+- `uv run python scripts/smoke_api.py`
 
 The smoke test covers signup, simulated checks, wallet connection persistence,
 lender deposit/withdrawal accounting, borrower collateral/quote/loan, and the
@@ -64,17 +64,17 @@ vault dashboard in developer-demo mode. The real application path requires Devne
 
 ## Vercel Layout
 
-Files added for deployment:
+Files used for deployment:
 
-- `vercel.json` builds the frontend and rewrites `/api/*` to the Python function.
-- `api/index.py` mounts `backend.main.app` at `/api`.
-- `requirements.txt` points Vercel's Python install at `backend/requirements.txt`.
-- root `package.json` provides local scripts and a Vercel-friendly project root.
+- `vercel.json` — frontend build + `/api/*` rewrite to the Python function; excludes microservice stubs from the serverless bundle.
+- `api/index.py` — mounts `backend.main.app` at `/api`.
+- `pyproject.toml` + `uv.lock` — Vercel uses **uv** to install Python deps; root project lists the product API runtime set.
+- `requirements.txt` — exported from `coinfish-api` for a pinned serverless install (`uv export --package coinfish-api --no-dev`).
+- `[tool.vercel] entrypoint = "api.index:app"` in `pyproject.toml`.
+- `.python-version` — `3.12` (Vercel-supported).
 
-Vercel currently documents FastAPI deployments as an exported `app` instance and
-local testing through `vercel dev`. It documents Vite as a static frontend build.
-This repo combines those two patterns: static Vite output plus a Python FastAPI
-function.
+CI production deploy (`.github/workflows/ci-prod.yml`) refreshes `requirements.txt`
+from the uv lock before `vercel build` / `vercel deploy --prebuilt`.
 
 ## Deploy
 

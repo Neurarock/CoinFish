@@ -42,7 +42,7 @@ export default function LenderDashboard() {
 
   return (
     <Layout role="lender">
-      <h1 className="text-3xl font-extrabold">Your lending dashboard</h1>
+      <h1 className="app-title text-3xl">Your lending dashboard</h1>
       <IdentityLinks account={d.account} />
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <Stat label="Total deposited" value={rlusd(d.total_deposited)} />

@@ -1,0 +1,313 @@
+/* Partner Portal MFE — same deep-water family as the marketing landing. */
+
+.partners-page {
+  --p-fg: #e6eef1;
+  --p-soft: #7a949e;
+  --p-line: rgba(120, 170, 180, 0.14);
+  --p-accent: #4ab8c4;
+  --p-accent-2: #6ec9b8;
+  --p-ink: #030b10;
+  --p-panel: #08141c;
+  min-height: 100vh;
+  color: var(--p-fg);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(74, 184, 196, 0.08), transparent),
+    var(--p-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.partners-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 2rem;
+}
+
+.partners-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  color: var(--p-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.partners-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.partners-nav-links a,
+.partners-text-btn {
+  color: var(--p-soft);
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 500;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.partners-nav-links a:hover,
+.partners-text-btn:hover {
+  color: var(--p-fg);
+}
+
+.partners-main {
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem 4rem;
+  min-height: calc(100vh - 5rem);
+}
+
+.partners-panel {
+  width: min(420px, 100%);
+  padding: 2rem 1.75rem;
+  border: 1px solid var(--p-line);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--p-panel) 88%, transparent);
+  animation: partners-rise 0.7s ease both;
+}
+
+.partners-kicker {
+  margin: 0 0 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-accent);
+}
+
+.partners-panel h1,
+.partners-home h1 {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.partners-lede {
+  margin: 0.75rem 0 0;
+  color: var(--p-soft);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.partners-lede strong,
+.partners-lede code {
+  color: var(--p-fg);
+  font-weight: 600;
+}
+
+.partners-lede code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.partners-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.75rem;
+}
+
+.partners-form label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.partners-form label span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-soft);
+}
+
+.partners-form label em {
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.partners-form input {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--p-line);
+  border-radius: 12px;
+  background: var(--p-ink);
+  color: var(--p-fg);
+  font: inherit;
+  font-size: 0.92rem;
+  outline: none;
+}
+
+.partners-form input:focus {
+  border-color: rgba(74, 184, 196, 0.55);
+}
+
+.partners-form input::placeholder {
+  color: rgba(122, 148, 158, 0.55);
+}
+
+.partners-err {
+  margin: 0;
+  color: #f07178;
+  font-size: 0.85rem;
+}
+
+.partners-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1.25rem;
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: 1px solid transparent;
+  border-radius: 980px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: filter 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.partners-btn:active {
+  transform: scale(0.98);
+}
+
+.partners-btn-primary {
+  color: #030b10;
+  background: linear-gradient(120deg, var(--p-accent), var(--p-accent-2));
+}
+
+.partners-form .partners-btn-primary {
+  width: 100%;
+}
+
+.partners-btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+.partners-btn-ghost {
+  color: var(--p-fg);
+  background: transparent;
+  border-color: var(--p-line);
+}
+
+.partners-btn-ghost:hover {
+  border-color: rgba(74, 184, 196, 0.45);
+}
+
+.partners-hint {
+  margin: 1.25rem 0 0;
+  font-size: 0.75rem;
+  color: rgba(122, 148, 158, 0.75);
+  text-align: center;
+}
+
+.partners-home {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2rem 2rem 4rem;
+  animation: partners-rise 0.7s ease both;
+}
+
+.partners-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.partners-tile {
+  padding: 1.5rem;
+  border: 1px solid var(--p-line);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--p-panel) 90%, transparent);
+}
+
+.partners-tile h2 {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.partners-tile > p {
+  margin: 0.55rem 0 1.1rem;
+  color: var(--p-soft);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.partners-placeholder-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--p-line);
+  font-size: 0.82rem;
+  color: var(--p-soft);
+}
+
+.partners-placeholder-row code {
+  color: var(--p-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+}
+
+.partners-empty {
+  padding: 1.5rem 0.75rem;
+  border: 1px dashed var(--p-line);
+  border-radius: 14px;
+  text-align: center;
+  color: var(--p-soft);
+  font-size: 0.85rem;
+}
+
+.partners-badge {
+  display: inline-block;
+  margin: 1rem 0 0;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-accent);
+  border: 1px solid rgba(74, 184, 196, 0.35);
+  border-radius: 980px;
+}
+
+.partners-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+@keyframes partners-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 720px) {
+  .partners-nav,
+  .partners-home {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+}

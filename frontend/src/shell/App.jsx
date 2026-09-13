@@ -5,6 +5,7 @@ import Guard from "./Guard.jsx";
 
 const LandingMFE = lazy(() => import("../mfe/landing/index.jsx"));
 const AuthMFE = lazy(() => import("../mfe/auth/index.jsx"));
+const PartnersMFE = lazy(() => import("../mfe/partners/index.jsx"));
 const LenderMFE = lazy(() => import("../mfe/lender/index.jsx"));
 const BorrowerMFE = lazy(() => import("../mfe/borrower/index.jsx"));
 const VaultMFE = lazy(() => import("../mfe/vault/index.jsx"));
@@ -12,8 +13,12 @@ const VaultMFE = lazy(() => import("../mfe/vault/index.jsx"));
 function MfeFallback() {
   return (
     <div className="app-bg flex min-h-screen items-center justify-center"
-      style={{ background: "#061018", color: "#9fb4c4" }}>
-      <div className="text-sm font-semibold tracking-wide">Loading CoinFish…</div>
+      style={{
+        background: "#000",
+        color: "#a1a1a6",
+        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif',
+      }}>
+      <div className="text-sm font-medium tracking-tight">Loading CoinFish…</div>
     </div>
   );
 }
@@ -24,6 +29,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingMFE />} />
         <Route path="/app" element={<AuthMFE />} />
+        <Route path="/partners/*" element={<PartnersMFE />} />
 
         <Route path="/lender/*" element={<Guard role="lender"><LenderMFE /></Guard>} />
         <Route path="/borrower/*" element={<Guard role="borrower"><BorrowerMFE /></Guard>} />

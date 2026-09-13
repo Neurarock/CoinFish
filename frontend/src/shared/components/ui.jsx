@@ -1,4 +1,4 @@
-// Small shared UI atoms used across all three themed views.
+// Small shared UI atoms used across all themed mini-frontends.
 export function Button({ variant = "primary", className = "", ...p }) {
   const v = variant === "primary" ? "btn-primary" : "btn-ghost";
   return <button className={`btn ${v} ${className}`} {...p} />;
@@ -6,8 +6,13 @@ export function Button({ variant = "primary", className = "", ...p }) {
 
 export function Field({ label, ...p }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>{label}</span>
+    <label className="block space-y-1.5">
+      <span
+        className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em]"
+        style={{ color: "var(--fg-soft)" }}
+      >
+        {label}
+      </span>
       <input className="input" {...p} />
     </label>
   );
@@ -15,9 +20,17 @@ export function Field({ label, ...p }) {
 
 export function Stat({ label, value, accent }) {
   return (
-    <div className="card p-4">
-      <div className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>{label}</div>
-      <div className="mt-1 text-2xl font-extrabold" style={{ color: accent ? "var(--accent)" : "var(--fg)" }}>
+    <div className="card p-5">
+      <div
+        className="text-[0.68rem] font-semibold uppercase tracking-[0.08em]"
+        style={{ color: "var(--fg-soft)" }}
+      >
+        {label}
+      </div>
+      <div
+        className="mt-2 text-[1.65rem] font-bold tracking-tight"
+        style={{ color: accent ? "var(--accent)" : "var(--fg)" }}
+      >
         {value}
       </div>
     </div>

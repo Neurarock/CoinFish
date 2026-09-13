@@ -1,0 +1,15 @@
+# Lending microservice — lender deposits, exit queue, yield views.
+
+[project]
+name = "coinfish-lending"
+version = "0.1.0"
+description = "CoinFish lending microservice"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "pydantic>=2.0",
+]
+
+[tool.uv]
+package = false

@@ -42,7 +42,7 @@ export default function LenderDeposit() {
 
   return (
     <Layout role="lender">
-      <h1 className="text-3xl font-extrabold">Choose a pool to fund</h1>
+      <h1 className="app-title text-3xl">Choose a pool to fund</h1>
       <p className="mt-1 mb-6" style={{ color: "var(--fg-soft)" }}>
         Deposits supply RLUSD to a Single Asset Vault and mint you vault shares. Yield accrues
         as borrowers pay interest. Capital out on loan returns within one 24-hour term.

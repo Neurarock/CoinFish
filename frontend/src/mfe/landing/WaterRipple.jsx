@@ -1,9 +1,15 @@
-// Cursor-driven water heightfield. A low-res simulation is scaled to fill the
-// viewport; mouse motion drops smooth disturbances that ripple outward.
-import { useEffect, useRef } from "react";
+// Cursor-driven water heightfield. Exposes drop(x,y,strength) for hero jumps.
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
-export default function WaterRipple() {
+const WaterRipple = forwardRef(function WaterRipple(_, ref) {
   const canvasRef = useRef(null);
+  const dropRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    drop(x, y, strength = 1) {
+      dropRef.current?.(x, y, strength);
+    },
+  }), []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -30,13 +36,12 @@ export default function WaterRipple() {
     let smoothY = -1;
     let lastTs = 0;
 
-    // Soft ocean palette (RGBA) sampled into the caustic shading.
     const deep = [6, 16, 24];
     const mid = [14, 58, 74];
     const light = [56, 168, 186];
     const foam = [186, 230, 236];
 
-    const CELL = 4; // simulation cell size in CSS pixels
+    const CELL = 4;
 
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -67,6 +72,7 @@ export default function WaterRipple() {
     }
 
     function drop(x, y, strength = 1) {
+      if (!curr) return;
       const cx = Math.floor(x / CELL);
       const cy = Math.floor(y / CELL);
       const radius = 3;
@@ -83,8 +89,9 @@ export default function WaterRipple() {
       }
     }
 
+    dropRef.current = drop;
+
     function step() {
-      // Wave equation on a 2D grid with light damping.
       for (let y = 1; y < rows - 1; y++) {
         const row = y * cols;
         for (let x = 1; x < cols - 1; x++) {
@@ -92,7 +99,7 @@ export default function WaterRipple() {
           const val =
             (curr[i - 1] + curr[i + 1] + curr[i - cols] + curr[i + cols]) / 2 -
             prev[i];
-          prev[i] = val * 0.985;
+          prev[i] = val * 0.94;
         }
       }
       const swap = curr;
@@ -107,18 +114,15 @@ export default function WaterRipple() {
         for (let x = 1; x < cols - 1; x++) {
           const i = row + x;
           const h = curr[i];
-          // Surface normal proxy from neighbouring heights.
           const nx = curr[i - 1] - curr[i + 1];
           const ny = curr[i - cols] - curr[i + cols];
           const shade = Math.max(-1, Math.min(1, nx * 0.35 + ny * 0.2 + h * 0.08));
 
-          // Vertical gradient base (deeper toward bottom of viewport).
           const gy = y / rows;
           let r = deep[0] + (mid[0] - deep[0]) * (1 - gy) * 0.85;
           let g = deep[1] + (mid[1] - deep[1]) * (1 - gy) * 0.85;
           let b = deep[2] + (mid[2] - deep[2]) * (1 - gy) * 0.85;
 
-          // Caustic highlight where the wave crest rises.
           const crest = Math.max(0, shade);
           r += (light[0] - r) * crest * 0.55;
           g += (light[1] - g) * crest * 0.55;
@@ -129,7 +133,6 @@ export default function WaterRipple() {
             g += (foam[1] - g) * foamMix * 0.35;
             b += (foam[2] - b) * foamMix * 0.35;
           }
-          // Soft trough darkening.
           const trough = Math.max(0, -shade);
           r -= trough * 18;
           g -= trough * 12;
@@ -148,7 +151,6 @@ export default function WaterRipple() {
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(offscreen, 0, 0, width, height);
 
-      // Soft vignette so content stays readable.
       const grd = ctx.createRadialGradient(
         width * 0.5, height * 0.35, width * 0.1,
         width * 0.5, height * 0.5, width * 0.85,
@@ -164,7 +166,6 @@ export default function WaterRipple() {
       const dt = Math.min(32, ts - lastTs || 16);
       lastTs = ts;
 
-      // Ease the disturbance toward the pointer for a liquid follow.
       if (pointerX >= 0) {
         if (smoothX < 0) {
           smoothX = pointerX;
@@ -188,7 +189,6 @@ export default function WaterRipple() {
         }
       }
 
-      // Idle ambient drip so the surface never feels frozen.
       if (Math.random() < 0.02) {
         drop(Math.random() * width, Math.random() * height * 0.7, 0.35);
       }
@@ -219,7 +219,6 @@ export default function WaterRipple() {
     }
 
     resize();
-    // Seed a gentle opening ripple near the brand area.
     drop(width * 0.35, height * 0.28, 4);
     drop(width * 0.62, height * 0.42, 2.2);
     raf = requestAnimationFrame(frame);
@@ -232,6 +231,7 @@ export default function WaterRipple() {
 
     return () => {
       running = false;
+      dropRef.current = null;
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", onMove);
@@ -248,4 +248,6 @@ export default function WaterRipple() {
       aria-hidden="true"
     />
   );
-}
+});
+
+export default WaterRipple;

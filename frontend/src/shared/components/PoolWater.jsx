@@ -28,7 +28,7 @@ export default function PoolWater({ level = 0.5, height = 150, label, sublabel, 
       </div>
 
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <div className="text-2xl font-extrabold drop-shadow">{Math.round(pct * 100)}%</div>
+        <div className="text-2xl font-bold tracking-tight drop-shadow">{Math.round(pct * 100)}%</div>
         {label && <div className="text-xs font-semibold opacity-80">{label}</div>}
         {sublabel && <div className="text-[10px] opacity-70">{sublabel}</div>}
       </div>

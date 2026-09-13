@@ -52,7 +52,7 @@ export default function BorrowerDashboard() {
 
   return (
     <Layout role="borrower">
-      <h1 className="text-3xl font-extrabold">
+      <h1 className="app-title text-3xl">
         <span className="morph-text">Borrowing dashboard</span>
       </h1>
       <div className="mt-5 grid gap-4 sm:grid-cols-4">

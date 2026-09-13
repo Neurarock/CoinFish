@@ -40,7 +40,7 @@ export default function BorrowerCollateral() {
 
   return (
     <Layout role="borrower">
-      <h1 className="text-3xl font-extrabold">Collateral</h1>
+      <h1 className="app-title text-3xl">Collateral</h1>
       <p className="mt-1 mb-6" style={{ color: "var(--fg-soft)" }}>
         Your fiat deposit is held off-chain by CoinFish as collateral. It backs your on-chain
         loans and is secured by sovereign law — never touches the ledger.

@@ -1,0 +1,1 @@
+"""CoinFish DB microservice package."""

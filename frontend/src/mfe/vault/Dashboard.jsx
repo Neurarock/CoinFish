@@ -60,7 +60,7 @@ export default function VaultDashboard() {
         style={{ borderColor: "var(--line)" }}>
         <div>
           <div className="vault-kicker">CoinFish · command layer</div>
-          <h1 className="text-2xl font-extrabold"><span className="morph-text">Vault explorer</span></h1>
+          <h1 className="app-title text-2xl"><span className="morph-text">Vault explorer</span></h1>
         </div>
         <div className="flex items-center gap-3 text-xs" style={{ color: "var(--fg-soft)" }}>
           <span className="inline-flex items-center gap-1.5">
@@ -272,7 +272,7 @@ function KV({ k, v, href }) {
 }
 
 function SectionTitle({ children }) {
-  return <h2 className="mt-7 mb-2 text-sm font-extrabold uppercase tracking-wider"
+  return <h2 className="mt-7 mb-2 text-sm font-semibold uppercase tracking-wider tracking-wider"
     style={{ color: "var(--fg-soft)" }}>{children}</h2>;
 }
 
@@ -280,7 +280,7 @@ function Metric({ label, value, accent, tone, divider }) {
   return (
     <div className="p-4" style={{ borderRight: divider ? "1px solid var(--line)" : "none" }}>
       <div className="exp-head">{label}</div>
-      <div className="mono mt-1 text-xl font-extrabold"
+      <div className="mono mt-1 text-xl font-bold tracking-tight"
         style={{ color: tone ? `var(--${tone})` : accent ? "var(--accent)" : "var(--fg)" }}>
         {value}
       </div>
@@ -309,7 +309,7 @@ function RiskMeter({ score, band }) {
       </div>
       <div className="mt-2 flex items-center justify-between text-xs" style={{ color: "var(--fg-soft)" }}>
         <span className="mono">0</span>
-        <span className="mono text-base font-extrabold" style={{ color: `var(--${tone})` }}>{Math.round(score)} / 100 · {band}</span>
+        <span className="mono text-base font-bold tracking-tight" style={{ color: `var(--${tone})` }}>{Math.round(score)} / 100 · {band}</span>
         <span className="mono">100</span>
       </div>
     </div>

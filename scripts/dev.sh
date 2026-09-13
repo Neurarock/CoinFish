@@ -5,14 +5,27 @@ cleanup() {
   if [ -n "${API_PID:-}" ]; then
     kill "$API_PID" 2>/dev/null || true
   fi
+  if [ -n "${DB_PID:-}" ]; then
+    kill "$DB_PID" 2>/dev/null || true
+  fi
   if [ -n "${WEB_PID:-}" ]; then
     kill "$WEB_PID" 2>/dev/null || true
   fi
 }
 trap cleanup INT TERM EXIT
 
-python3 -m uvicorn backend.main:app --reload --port 8000 &
+# Prefer uv-managed interpreter when available.
+if command -v uv >/dev/null 2>&1; then
+  UV_RUN="uv run"
+else
+  UV_RUN=""
+fi
+
+$UV_RUN python -m uvicorn backend.main:app --reload --port 8000 &
 API_PID=$!
+
+$UV_RUN python -m uvicorn db_service.main:app --reload --host 127.0.0.1 --port 8001 &
+DB_PID=$!
 
 cd frontend
 npm run dev -- --host 127.0.0.1 &
@@ -20,7 +33,9 @@ WEB_PID=$!
 cd ..
 
 printf "\nCoinFish local dev\n"
-printf "  API:      http://127.0.0.1:8000\n"
-printf "  Frontend: http://127.0.0.1:5173\n\n"
+printf "  API:      http://127.0.0.1:8000  (product BFF)\n"
+printf "  DB API:   http://127.0.0.1:8001  (persistence)\n"
+printf "  Frontend: http://127.0.0.1:5173\n"
+printf "  Domain stubs: npm run svc:auth|pools|lending|borrowing|xrpl|admin\n\n"
 
 wait

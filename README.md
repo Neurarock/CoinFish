@@ -17,47 +17,37 @@ Testnet/Mainnet only — so they can't coexist. On Devnet, CoinFish mints its ow
 trustline IOU with the currency code `RLUSD` as a stand-in stablecoin.
 
 ## Stack
-- **Backend:** FastAPI + `xrpl-py` 5.0.0 (all on-chain logic is Python)
-- **Frontend:** React (Vite + Tailwind) — the demo dashboard
-- **Off-chain state:** SQLite (KYC, fiat deposits, credit policy)
+- **Backend:** FastAPI microservices via **uv** (`backend` product API, `db_service`, domain stubs under `services/`)
+- **Frontend:** React (Vite) — stays on npm
+- **Off-chain state:** SQLite locally; Postgres via `db_service` + Docker
 
 ## Layout
 ```
-backend/
-  config.py            network, seeds, fee + pool params, 72h term cap
-  main.py              FastAPI app
-  risk_engine.py       interest-rate / credit logic (off-chain)
-  exit_queue.py        fair FIFO withdrawal queue for lender exits
-  xrpl_service/        client, assets(RLUSD), identity, vault, broker, loan
-  scripts/
-    bootstrap_devnet.py  one-shot: wallets, RLUSD, domain, 3 pools
-    validate_offline.py  build/validate/sign every tx offline (no network)
-    run_demo.py          full A->G live lifecycle (incl. default path)
-    run_exit_demo.py     live bank-run: exit queue under liquidity stress
-  tests/               pytest unit tests (exit queue, risk engine)
-frontend/              React dashboard (lender / borrower / vault, themed)
-reference/             starter scripts kept for porting (JS credentials/domains, python)
-SPEC.md                full spec
+backend/               Product API / BFF (port 8000) — what the UI calls today
+db_service/            Persistence microservice (port 8001) + Alembic
+services/              Domain FastAPI stubs (auth, pools, lending, borrowing, xrpl, admin)
+frontend/              React (npm / Vite)
+pyproject.toml         uv workspace root
+uv.lock                Locked Python deps
 ```
 
 ## Quick start
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r backend/requirements.txt
+# Python toolchains (one-time)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync --all-packages
 
 # 1. Offline checks — NO network needed
-python -m pytest backend/tests/ -q            # exit-queue + risk-engine unit tests
-python -m backend.scripts.validate_offline    # build/validate/sign every tx offline
+uv run pytest backend/tests/ -q
+uv run python -m backend.scripts.validate_offline
 
 # 2. Live on Devnet (needs open internet)
-python -m backend.scripts.run_demo            # full A->G lifecycle incl. default path
-python -m backend.scripts.run_exit_demo       # bank-run: exit queue under stress
+uv run python -m backend.scripts.run_demo
+uv run python -m backend.scripts.bootstrap_devnet
 
-# or just stand up the 3 pools and capture seeds/ids for .env
-python -m backend.scripts.bootstrap_devnet
-
-# run the API
-uvicorn backend.main:app --reload
+# run the product API
+uv run uvicorn backend.main:app --reload
+# or: npm run api
 ```
 
 For the React/FastAPI local app and Vercel deployment workflow, see
@@ -65,9 +55,12 @@ For the React/FastAPI local app and Vercel deployment workflow, see
 
 ```bash
 cd frontend && npm install && cd ..
-npm run dev:devnet   # frontend :5173 + API :8000, real XRPL Devnet submits
+npm run uv:sync
+npm run dev:devnet   # frontend :5173 + API :8000 + db API :8001
 npm run test:local   # backend tests + frontend build + API smoke test
 ```
+
+See **[services/README.md](./services/README.md)** for the microservice map and ports.
 
 Each live step prints a `tesSUCCESS` hash + explorer link, and `run_demo` prints
 the `vault_id` / `broker_id` / `domain_id` plus the operator account link so you

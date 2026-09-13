@@ -11,11 +11,11 @@ export default function Footer() {
   return (
     <footer className="relative z-10 mt-16">
       <hr className="morph-rule" />
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-7 text-sm
-                      md:flex-row md:items-center md:justify-between"
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 text-sm tracking-tight
+                      md:flex-row md:items-center md:justify-between md:px-8"
         style={{ color: "var(--fg-soft)" }}>
         <a href={REPO} target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-2 font-semibold"
+          className="inline-flex items-center gap-2 font-medium"
           style={{ color: "var(--fg)" }}>
           <GitHubLogo />
           <span>Neurarock/CoinFish</span>
@@ -23,10 +23,10 @@ export default function Footer() {
         </a>
 
         <div className="text-center md:text-right">
-          <span className="font-semibold morph-text">
+          <span className="font-medium morph-text">
             Built by Team 5 for UK Finnovator · Ripple Track @ 2026
           </span>
-          <div className="mt-1">
+          <div className="mt-1.5">
             <button onClick={() => setTerms((v) => !v)}
               className="underline decoration-dotted underline-offset-2"
               style={{ color: "var(--fg-soft)" }}>
@@ -44,8 +44,8 @@ export default function Footer() {
       </div>
 
       {terms && (
-        <div className="mx-auto max-w-6xl px-6 pb-8">
-          <div className="card p-4 text-xs leading-relaxed" style={{ color: "var(--fg-soft)" }}>
+        <div className="mx-auto max-w-6xl px-6 pb-8 md:px-8">
+          <div className="card p-5 text-xs leading-relaxed tracking-tight" style={{ color: "var(--fg-soft)" }}>
             <b style={{ color: "var(--fg)" }}>Terms of Service.</b> This site is provided
             for <b>demonstration purposes only</b> and is <b>not a working financial services
             platform</b>. Nothing here is an offer, solicitation, or advice to lend, borrow, or

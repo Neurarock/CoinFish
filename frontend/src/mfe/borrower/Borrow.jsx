@@ -72,7 +72,7 @@ export default function BorrowerBorrow() {
 
   return (
     <Layout role="borrower">
-      <h1 className="text-3xl font-extrabold">
+      <h1 className="app-title text-3xl">
         <span className="morph-text">Borrow</span>
       </h1>
       <p className="mt-1 mb-6" style={{ color: "var(--fg-soft)" }}>
@@ -197,7 +197,7 @@ function QuoteCard({ p, left, onAccept }) {
         <Countdown left={left} total={QUOTE_WINDOW} />
         <div>
           <div className="text-xs" style={{ color: "var(--fg-soft)" }}>Offered rate</div>
-          <div className="text-3xl font-extrabold morph-text">{pct(q.interest_rate)}</div>
+          <div className="app-title text-3xl morph-text">{pct(q.interest_rate)}</div>
           <div className="text-[11px]" style={{ color: "var(--fg-soft)" }}>APR · {q.term_hours}h term</div>
         </div>
       </div>

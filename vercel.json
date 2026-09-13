@@ -2,6 +2,11 @@
   "framework": null,
   "buildCommand": "cd frontend && npm ci && npm run build",
   "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.py": {
+      "excludeFiles": "{frontend/**,services/**,db_service/**,backend/tests/**,backend/scripts/**,reference/**,docs/**,.venv/**,node_modules/**,**/*.md,uv.lock}"
+    }
+  },
   "rewrites": [
     {
       "source": "/api",

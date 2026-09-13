@@ -82,7 +82,7 @@ function Overlay({ st, onClose }) {
           {status === "success" && <ResultMark tone="good">✓</ResultMark>}
           {status === "error" && <ResultMark tone="bad">!</ResultMark>}
           <div>
-            <div className="text-lg font-extrabold morph-text">
+            <div className="text-lg font-bold tracking-tight morph-text">
               {status === "error" ? "Couldn’t complete" : status === "success" ? successLabel : title}
             </div>
             <div className="text-xs" style={{ color: "var(--fg-soft)" }}>

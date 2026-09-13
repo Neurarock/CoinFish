@@ -3,10 +3,8 @@
 @tailwind utilities;
 
 /* ----------------------------------------------------------------------------
-   Theme system. Each role gets its own palette via CSS variables set on a
-   wrapping element (see ThemeShell). Components style themselves with these
-   vars, so the same component renders correctly in any of the three worlds:
-     lender  -> bright white      borrower -> crisp black      vault -> pool blue
+   Theme system. Each role keeps its own palette; chrome (type, radius, density)
+   matches the marketing MFE Apple-style language across every mini-frontend.
 ---------------------------------------------------------------------------- */
 :root {
   --bg: #f7fafc;
@@ -22,8 +20,12 @@
   --bad: #dc2626;
   --water-top: #c4b5fd;
   --water-bot: #7c3aed;
-  --radius: 0px;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --radius-pill: 980px;
   --card-shadow: none;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 /* LENDER — bright, airy white with a PURPLE accent */
@@ -38,7 +40,7 @@
   --accent-fg: #ffffff;
   --water-top: #c4b5fd;
   --water-bot: #7c3aed;
-  --card-shadow: 0 10px 34px rgba(124, 58, 237, 0.12);
+  --card-shadow: 0 12px 40px rgba(124, 58, 237, 0.1);
 }
 
 /* BORROWER — crisp pure black */
@@ -53,7 +55,7 @@
   --accent-fg: #04121a;
   --water-top: #155e75;
   --water-bot: #06303d;
-  --card-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+  --card-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
 
 /* VAULT / COINFISH — deep ink with a PINK accent */
@@ -68,22 +70,56 @@
   --accent-fg: #2a0a1d;
   --water-top: #f9a8d4;
   --water-bot: #db2777;
-  --card-shadow: none;
+  --card-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
 
 .app-bg {
   min-height: 100vh;
   background: var(--bg);
   color: var(--fg);
+  font-family: var(--font-sans);
   transition: background 0.4s ease, color 0.4s ease;
+}
+
+.app-title {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.app-kicker {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.app-nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .card {
   background: var(--bg-soft);
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
 }
@@ -95,88 +131,99 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   gap: 0.4rem;
   text-align: center;
   line-height: 1.1;
-  border-radius: 0;
-  padding: 0.65rem 1.25rem;
-  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: 0.72rem 1.3rem;
+  font-weight: 560;
+  font-size: 0.92rem;
+  letter-spacing: -0.01em;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: transform 0.12s ease, filter 0.2s ease, background 0.2s ease;
+  transition: transform 0.15s ease, filter 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
-.btn:active { transform: translateY(1px) scale(0.99); }
+.btn:active { transform: scale(0.98); }
 .btn-primary { background: var(--accent); color: var(--accent-fg); }
-.btn-primary:hover { filter: brightness(1.06); }
-.btn-ghost { background: transparent; color: var(--fg); border-color: var(--line); }
+.btn-primary:hover { filter: brightness(1.05); }
+.btn-ghost {
+  background: transparent;
+  color: var(--fg);
+  border-color: color-mix(in srgb, var(--line) 85%, var(--fg-soft));
+}
+.btn-ghost:hover {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
 
 .input {
   width: 100%;
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--line);
-  border-radius: 0;
-  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  padding: 0.72rem 0.9rem;
   outline: none;
+  font: inherit;
+  letter-spacing: -0.01em;
+  transition: border-color 0.2s ease;
 }
 .input:focus { border-color: var(--accent); }
 
-.pill { border-radius: 0; padding: 0.2rem 0.6rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; }
+.pill {
+  border-radius: var(--radius-pill);
+  padding: 0.22rem 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
 
 .verify-link {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
   margin-top: 0.5rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
-  border-radius: 0;
-  padding: 0.32rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  border-radius: var(--radius-pill);
+  padding: 0.34rem 0.7rem;
   color: var(--accent);
-  background:
-    radial-gradient(circle at 12% 50%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 28%),
-    color-mix(in srgb, var(--accent) 6%, var(--bg-soft));
-  font-size: 0.78rem;
-  font-weight: 800;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-soft));
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   text-decoration: none;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent),
-              0 8px 20px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .verify-link:hover { filter: brightness(1.05); }
 .verify-link code {
   color: var(--fg-soft);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 .verify-dot {
   width: 0.48rem;
   height: 0.48rem;
   border-radius: 999px;
   background: var(--accent);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .theme-vault.app-bg { background: #140812; }
 
 .vault-kicker {
   color: var(--accent);
-  font-size: 0.72rem;
-  font-weight: 900;
+  font-size: 0.68rem;
+  font-weight: 650;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
-/* ----------------------------------------------------------------------------
-   "Expensively made" — morphing colour accents. A slow-shifting gradient is
-   reused for animated borders, headline text, the brand mark and the live
-   Devnet badge so every world has the same premium, alive feel.
----------------------------------------------------------------------------- */
+/* Soft accent motion — kept, but quieter than before. */
 @keyframes morph-pan {
   0%   { background-position: 0% 50%; }
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
 @keyframes morph-glow {
-  0%, 100% { opacity: 0.55; filter: blur(14px); }
-  50%      { opacity: 0.95; filter: blur(20px); }
+  0%, 100% { opacity: 0.45; filter: blur(14px); }
+  50%      { opacity: 0.8; filter: blur(18px); }
 }
 @keyframes badge-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
   70%  { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 0%, transparent); }
   100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
 }
@@ -185,7 +232,6 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   100% { transform: translateX(220%); }
 }
 
-/* Animated gradient text for hero headlines and section titles. */
 .morph-text {
   background: linear-gradient(110deg, var(--accent), var(--accent-2), var(--accent));
   background-size: 220% 220%;
@@ -196,9 +242,6 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   animation: morph-pan 7s ease-in-out infinite;
 }
 
-/* A card/panel whose 1px edge is a slowly morphing gradient (the expensive bit).
-   Uses the padding-box / border-box double-background technique so it renders
-   correctly on iOS Safari (no mask-composite, which Safari handles unreliably). */
 .morph-edge {
   position: relative;
   border: 1px solid transparent;
@@ -209,7 +252,7 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   background-size: 100% 100%, 240% 240%;
   animation: morph-pan 9s ease-in-out infinite;
 }
-/* Soft aura behind a featured element. */
+
 .morph-aura { position: relative; }
 .morph-aura::after {
   content: "";
@@ -222,7 +265,6 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   animation: morph-pan 8s ease-in-out infinite, morph-glow 6s ease-in-out infinite;
 }
 
-/* Top accent rule used by the footer + section dividers. */
 .morph-rule {
   height: 1px;
   border: 0;
@@ -231,7 +273,6 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   animation: morph-pan 8s linear infinite;
 }
 
-/* Primary buttons get a sweeping sheen on hover for a tactile, costly feel. */
 .btn-primary {
   position: relative;
   overflow: hidden;
@@ -244,32 +285,31 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   position: absolute;
   top: 0; bottom: 0; left: 0;
   width: 40%;
-  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.45), transparent);
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.4), transparent);
   transform: translateX(-120%);
 }
 .btn-primary:hover::after { animation: sheen 0.9s ease; }
 
-/* Live Devnet badge in the top-right corner. */
 .devnet-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.36rem 0.7rem 0.36rem 0.5rem;
-  border-radius: 0;
+  gap: 0.45rem;
+  padding: 0.34rem 0.75rem 0.34rem 0.5rem;
+  border-radius: var(--radius-pill);
   text-decoration: none;
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   color: var(--accent-fg);
   background: linear-gradient(120deg, var(--accent), var(--accent-2), var(--accent));
   background-size: 220% 220%;
   animation: morph-pan 6s ease-in-out infinite;
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 26%, transparent);
 }
-.devnet-badge:hover { filter: brightness(1.07); }
+.devnet-badge:hover { filter: brightness(1.06); }
 .devnet-badge .devnet-orb {
-  width: 0.62rem;
-  height: 0.62rem;
+  width: 0.55rem;
+  height: 0.55rem;
   border-radius: 999px;
   background: #fff;
   animation: badge-pulse 1.8s ease-out infinite;
@@ -281,7 +321,6 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   box-shadow: none;
 }
 
-/* Processing overlay. */
 .tx-scrim {
   position: fixed;
   inset: 0;
@@ -289,8 +328,8 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   display: grid;
   place-items: center;
   background: radial-gradient(circle at 50% 30%, rgba(0,0,0,0.55), rgba(0,0,0,0.78));
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   animation: fade-in 0.25s ease;
 }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -299,7 +338,7 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
 .tx-card {
   width: min(440px, 92vw);
   padding: 1.6rem;
-  border-radius: 0;
+  border-radius: 22px;
   background: var(--bg-soft);
   color: var(--fg);
   box-shadow: 0 30px 80px rgba(0,0,0,0.45);
@@ -320,7 +359,7 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   width: 1.05rem; height: 1.05rem; border-radius: 999px;
   display: grid; place-items: center; flex: none;
   border: 2px solid var(--line); color: var(--accent-fg);
-  font-size: 0.62rem; font-weight: 900;
+  font-size: 0.62rem; font-weight: 800;
 }
 .tx-dot.done { background: var(--good); border-color: var(--good); }
 .tx-dot.active { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent); }
@@ -329,39 +368,19 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
   background: var(--accent); animation: badge-pulse 1.4s infinite;
 }
 
-/* ----------------------------------------------------------------------------
-   Boxy by request: square every Tailwind rounded-* utility and component. Small
-   circular indicators (status dots, spinners, gauges) keep their own radius
-   because they set it on dedicated classes, not on a `rounded-*` utility.
----------------------------------------------------------------------------- */
-[class*="rounded"] { border-radius: 0 !important; }
+.home-page { --radius: 18px; }
 
-/* …but the home page keeps its soft, rounded look. */
-.home-page { --radius: 10px; }
-.home-page .rounded-sm  { border-radius: 0.125rem !important; }
-.home-page .rounded     { border-radius: 0.25rem !important; }
-.home-page .rounded-md  { border-radius: 0.375rem !important; }
-.home-page .rounded-lg  { border-radius: 0.5rem !important; }
-.home-page .rounded-xl  { border-radius: 0.75rem !important; }
-.home-page .rounded-2xl { border-radius: 1rem !important; }
-.home-page .rounded-3xl { border-radius: 1.5rem !important; }
-.home-page .rounded-full { border-radius: 9999px !important; }
-.home-page .card, .home-page .btn { border-radius: 8px !important; }
-.home-page .input { border-radius: 12px !important; }
-.home-page .pill, .home-page .verify-link, .home-page .devnet-badge { border-radius: 9999px !important; }
-
-/* Explorer-style hairline rows (devnet.xrpl.org feel). */
 .exp-row {
   display: grid;
   align-items: center;
   gap: 1rem;
-  padding: 0.6rem 0.85rem;
+  padding: 0.7rem 0.95rem;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }
 .exp-row:last-child { border-bottom: 0; }
 .exp-head {
   font-size: 0.66rem;
-  font-weight: 800;
+  font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--fg-soft);
@@ -369,13 +388,11 @@ body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
 .exp-panel {
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   background: color-mix(in srgb, var(--bg-soft) 86%, transparent);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 .mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 
-/* ----------------------------------------------------------------------------
-   Custom fish cursor across the whole site (downscaled logo, hotspot near the
-   nose). Interactive elements keep a `pointer` fallback for older browsers.
----------------------------------------------------------------------------- */
 html, body, .app-bg { cursor: url("/cursor-fish.png") 12 10, auto; }
 a, button, .btn, label, summary, select, [role="button"], .pill, .verify-link,
 .devnet-badge, [onclick] { cursor: url("/cursor-fish.png") 12 10, pointer; }

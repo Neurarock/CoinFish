@@ -1,0 +1,20 @@
+# CoinFish product API (BFF) — FastAPI microservice on port 8000.
+# Frontend talks here. Owns auth/pools/lenders/borrowers/loans/admin routers
+# and XRPL orchestration until those domains are fully extracted.
+
+[project]
+name = "coinfish-api"
+version = "0.2.0"
+description = "CoinFish product API"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "sqlmodel>=0.0.16",
+  "python-dotenv>=1.0",
+  "xrpl-py>=5.0.0",
+  "psycopg[binary]>=3.1",
+]
+
+[tool.uv]
+package = false

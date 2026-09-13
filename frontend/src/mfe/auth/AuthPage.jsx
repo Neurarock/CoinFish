@@ -1,9 +1,8 @@
-// Auth mini-frontend: login / signup for both roles. Signup collects company
-// details (for show only — no real verification), then the KYC button (+ credit
-// check for borrowers) flips orange->green, then connect wallet, then enter the
-// app. The page re-themes live to match the selected role. Mounted at /app.
+// Launch App mini-frontend: login / signup for lenders and borrowers.
+// Signup collects company details (for show only), then KYC (+ credit for
+// borrowers), wallet connect, then enter the product worlds. Mounted at /app.
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../shared/store.jsx";
 import { api } from "../../shared/api.js";
 import { Button, Field, Pill, VerifyLink, rlusd } from "../../shared/components/ui.jsx";
@@ -91,29 +90,34 @@ export default function AuthPage() {
 
   return (
     <div className={`home-page app-bg ${THEME[role]} min-h-screen flex flex-col`}>
-      <div className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3 text-xl font-extrabold">
-          <Logo size={68} to="/" /> CoinFish
+      <div className="flex items-center justify-between gap-4 px-6 py-4 md:px-8">
+        <div className="flex items-center gap-3 text-[1.05rem] font-semibold tracking-tight">
+          <Logo size={44} to="/" />
+          <span>CoinFish · Launch App</span>
         </div>
-        <div className="flex items-center gap-3">
-          <a href="/" className="text-sm font-semibold" style={{ color: "var(--fg-soft)" }}>
-            Company site
-          </a>
-          <a href="/vault" className="text-sm font-semibold" style={{ color: "var(--fg-soft)" }}>
-            CoinFish vault ↗
-          </a>
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          <Link to="/" className="app-nav-link" style={{ color: "var(--fg-soft)" }}>
+            Company
+          </Link>
+          <Link to="/partners" className="app-nav-link" style={{ color: "var(--fg-soft)" }}>
+            Partner Portal
+          </Link>
+          <Link to="/vault" className="app-nav-link" style={{ color: "var(--fg-soft)" }}>
+            Vault
+          </Link>
           <DevnetBadge />
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-10 px-6 py-8 md:grid-cols-2">
+      <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-10 px-6 py-10 md:grid-cols-2 md:px-8">
         {/* pitch side */}
-        <div className="space-y-4">
-          <h1 className="text-4xl font-extrabold leading-tight">
+        <div className="space-y-5">
+          <p className="app-kicker">Launch App</p>
+          <h1 className="app-title text-4xl md:text-5xl">
             Fiat-rich, crypto-poor?<br />
             <span className="morph-text">Borrow on-chain in seconds.</span>
           </h1>
-          <p style={{ color: "var(--fg-soft)" }}>
+          <p className="text-[1.05rem] leading-relaxed tracking-tight" style={{ color: "var(--fg-soft)" }}>
             Lenders supply RLUSD into risk-tiered pools and earn yield. Borrowers post
             fiat collateral off-chain and draw instant stablecoin loans on the XRP Ledger.
           </p>
@@ -124,8 +128,8 @@ export default function AuthPage() {
         </div>
 
         {/* form side */}
-        <div className="card p-6">
-          <div className="mb-4 flex gap-2 text-sm">
+        <div className="card p-6 md:p-7">
+          <div className="mb-5 flex gap-2 text-sm">
             <TabBtn on={mode === "signup"} onClick={() => setMode("signup")}>Sign up</TabBtn>
             <TabBtn on={mode === "login"} onClick={() => setMode("login")}>Log in</TabBtn>
             <span className="ml-auto"><Pill tone={role === "lender" ? "accent" : "muted"}>{role}</Pill></span>
@@ -200,16 +204,32 @@ export default function AuthPage() {
 function RoleTab({ cur, val, set, label, sub }) {
   const on = cur === val;
   return (
-    <button onClick={() => set(val)} className="card flex-1 p-3 text-left"
-      style={{ outline: on ? "2px solid var(--accent)" : "none" }}>
-      <div className="font-bold">{label}</div>
-      <div className="text-xs" style={{ color: "var(--fg-soft)" }}>{sub}</div>
+    <button
+      type="button"
+      onClick={() => set(val)}
+      className="card flex-1 p-3.5 text-left transition"
+      style={{
+        outline: on ? "2px solid var(--accent)" : "1px solid transparent",
+        outlineOffset: 0,
+      }}
+    >
+      <div className="font-semibold tracking-tight">{label}</div>
+      <div className="mt-0.5 text-xs tracking-tight" style={{ color: "var(--fg-soft)" }}>{sub}</div>
     </button>
   );
 }
 function TabBtn({ on, ...p }) {
-  return <button {...p} className="rounded-full px-3 py-1 font-semibold"
-    style={{ background: on ? "var(--accent)" : "transparent", color: on ? "var(--accent-fg)" : "var(--fg-soft)" }} />;
+  return (
+    <button
+      {...p}
+      type="button"
+      className="rounded-full px-3.5 py-1.5 text-sm font-medium tracking-tight"
+      style={{
+        background: on ? "var(--accent)" : "transparent",
+        color: on ? "var(--accent-fg)" : "var(--fg-soft)",
+      }}
+    />
+  );
 }
 
 const PROVIDERS = [

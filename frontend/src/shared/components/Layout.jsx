@@ -37,35 +37,48 @@ export default function Layout({ role, children }) {
 
   return (
     <div className={`app-bg ${THEME[role] || ""}`}>
-      <header className="relative z-10 flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3 font-extrabold text-lg">
-          <Logo size={56} to="/" />
+      <header className="relative z-10 flex items-center justify-between gap-4 px-6 py-4 md:px-8">
+        <div className="flex items-center gap-3 text-[1.05rem] font-semibold tracking-tight">
+          <Logo size={44} to="/" />
           {TITLE[role] || "CoinFish"}
         </div>
-        <nav className="flex items-center gap-1">
-          {links.map(([to, label]) => (
-            <Link key={to} to={to}
-              className="rounded-full px-3 py-1.5 text-sm font-semibold"
-              style={{
-                background: loc.pathname === to ? "var(--accent)" : "transparent",
-                color: loc.pathname === to ? "var(--accent-fg)" : "var(--fg-soft)",
-              }}>
-              {label}
-            </Link>
-          ))}
+        <nav className="flex flex-wrap items-center justify-end gap-1">
+          {links.map(([to, label]) => {
+            const on = loc.pathname === to;
+            return (
+              <Link
+                key={to}
+                to={to}
+                className="app-nav-link"
+                style={{
+                  background: on ? "var(--accent)" : "transparent",
+                  color: on ? "var(--accent-fg)" : "var(--fg-soft)",
+                  borderColor: on ? "transparent" : "transparent",
+                }}
+              >
+                {label}
+              </Link>
+            );
+          })}
+          <Link to="/" className="app-nav-link" style={{ color: "var(--fg-soft)" }}>
+            Company
+          </Link>
           {account && (
-            <button onClick={() => { logout(); nav("/app"); }}
-              className="ml-2 rounded-full px-3 py-1.5 text-sm font-semibold"
-              style={{ color: "var(--fg-soft)" }}>
+            <button
+              type="button"
+              onClick={() => { logout(); nav("/app"); }}
+              className="app-nav-link ml-1"
+              style={{ color: "var(--fg-soft)", background: "transparent", border: 0 }}
+            >
               Sign out
             </button>
           )}
-          <span className="ml-2 hidden sm:inline-flex">
+          <span className="ml-1 hidden sm:inline-flex">
             <DevnetBadge status={status} />
           </span>
         </nav>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-6 py-8 md:px-8">{children}</main>
       <Footer />
     </div>
   );

@@ -36,6 +36,21 @@ For stub services (flat `main.py` modules):
 uv run uvicorn --app-dir services/auth main:app --reload --port 8002
 ```
 
+## DB migrations (Alembic)
+
+```bash
+# Local Docker Postgres (default when NEON_DEV is unset)
+npm run db:up
+npm run db:migrate
+
+# Ephemeral Neon dev branch — set NEON_DEV in repo-root `.env`
+npm run db:migrate:neon   # same Alembic upgrade; URL comes from NEON_DEV
+npm run test:db:neon       # live upgrade/downgrade against that branch
+```
+
+`NEON_DEV` is intended for short-lived branches (Neon can auto-delete after ~1 day).
+Do not point durable app traffic at it; use `NEON` / `COINFISH_DB_URL` for that.
+
 ## Adding a new microservice
 
 1. Copy an existing folder under `services/`.

@@ -14,7 +14,14 @@ from fastapi import FastAPI
 # database is configured (Vercel Postgres / Neon / Supabase expose one of these
 # env vars), use it for durable, shared state. Only fall back to writable /tmp
 # SQLite when nothing persistent is available.
-_PERSISTENT = ("COINFISH_DB_URL", "DATABASE_URL", "POSTGRES_URL_NON_POOLING", "POSTGRES_URL", "NEON")
+_PERSISTENT = (
+    "COINFISH_DB_URL",
+    "DATABASE_URL",
+    "POSTGRES_URL_NON_POOLING",
+    "POSTGRES_URL",
+    "NEON",
+    "NEON_DEV",
+)
 if not any(os.getenv(k) for k in _PERSISTENT):
     os.environ["COINFISH_DB_URL"] = "sqlite:////tmp/coinfish.db"
 

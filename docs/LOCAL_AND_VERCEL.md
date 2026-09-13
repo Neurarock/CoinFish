@@ -100,16 +100,22 @@ directory.
 Useful variables:
 
 - `COINFISH_DB_URL`: local defaults to `sqlite:///./coinfish.db`.
+- `NEON`: stable Neon Postgres URL (also accepted by the product API / Vercel).
+- `NEON_DEV`: ephemeral Neon **dev branch** URL (auto-deletes after ~1 day).
+  When set, `db_service` / Alembic prefer it over local Docker so you can run
+  migration experiments safely: `npm run db:migrate` or `npm run test:db:neon`.
 - `COINFISH_SETUP_JSON`: path to Devnet bootstrap ids/seeds, default `setup.json`.
 - `COINFISH_ISSUER_SEED`, `COINFISH_ISSUER_ADDRESS`, `COINFISH_OPERATOR_SEED`:
   Devnet throwaway setup values.
 - `COINFISH_POOL_LOW_VAULT_ID`, `COINFISH_POOL_LOW_LOAN_BROKER_ID`, and the same
   pattern for `MED` and `HIGH`: pool ids for Vercel env-only setup.
 
+See the root [`.env.example`](../.env.example) for the full template.
+
 On Vercel, `api/index.py` defaults `COINFISH_DB_URL` to
 `sqlite:////tmp/coinfish.db` so preview deployments are writable. That state is
 ephemeral and can disappear on cold starts or redeploys. For durable deployed
-state, use a hosted database and set `COINFISH_DB_URL` to its SQLAlchemy URL.
+state, use a hosted database and set `COINFISH_DB_URL` (or `NEON`) to its URL.
 
 ## Notes
 

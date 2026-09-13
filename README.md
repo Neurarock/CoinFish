@@ -19,7 +19,7 @@ trustline IOU with the currency code `RLUSD` as a stand-in stablecoin.
 ## Stack
 - **Backend:** FastAPI microservices via **uv** (`backend` product API, `db_service`, domain stubs under `services/`)
 - **Frontend:** React (Vite) — stays on npm
-- **Off-chain state:** SQLite locally; Postgres via `db_service` + Docker
+- **Off-chain state:** SQLite locally; Postgres via `db_service` + Docker or Neon (`NEON` / ephemeral `NEON_DEV` for migration tests)
 
 ## Layout
 ```

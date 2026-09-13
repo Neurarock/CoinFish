@@ -34,7 +34,8 @@ def _resolve_db_url() -> str:
         or os.getenv("DATABASE_URL")
         or os.getenv("POSTGRES_URL_NON_POOLING")
         or os.getenv("POSTGRES_URL")
-        or os.getenv("NEON")            # the name used in this project's env
+        or os.getenv("NEON")            # stable Neon URL (Vercel / durable)
+        or os.getenv("NEON_DEV")        # ephemeral Neon branch (migration experiments)
         or "sqlite:///./coinfish.db"
     )
     # Normalise Postgres scheme variants onto the psycopg (v3) driver.

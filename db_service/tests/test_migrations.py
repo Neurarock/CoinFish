@@ -1,17 +1,35 @@
-"""Alembic migration upgrade / downgrade tests against a temp SQLite DB."""
+"""Alembic migration upgrade / downgrade tests.
+
+Default suite uses a temp SQLite DB. Optional Neon coverage runs when
+`NEON_DEV` is set (ephemeral branch that auto-expires — safe for experiments).
+"""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, inspect, text
 
 DB_SERVICE_DIR = Path(__file__).resolve().parents[1]
+REPO_ROOT = DB_SERVICE_DIR.parent
 ALEMBIC_INI = DB_SERVICE_DIR / "alembic.ini"
 
 EXPECTED_TABLES = {"lenders", "borrowers", "pools", "partners", "transactions", "alembic_version"}
+
+load_dotenv(REPO_ROOT / ".env")
+load_dotenv(REPO_ROOT / ".env.local", override=True)
+
+
+def _normalize_url(url: str) -> str:
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://") :]
+    if url.startswith("postgresql://") and "+psycopg" not in url:
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
 
 
 def _alembic_config(db_url: str) -> Config:
@@ -24,6 +42,14 @@ def _alembic_config(db_url: str) -> Config:
 @pytest.fixture()
 def sqlite_url(tmp_path: Path) -> str:
     return f"sqlite:///{tmp_path / 'migrate.db'}"
+
+
+@pytest.fixture()
+def neon_dev_url() -> str:
+    raw = os.getenv("NEON_DEV")
+    if not raw:
+        pytest.skip("NEON_DEV not set — skipping ephemeral Neon migration tests")
+    return _normalize_url(raw)
 
 
 def test_upgrade_creates_all_tables(sqlite_url: str):
@@ -101,3 +127,41 @@ def test_migrated_schema_accepts_inserts(sqlite_url: str):
         count = conn.execute(text("SELECT COUNT(*) FROM transactions")).scalar_one()
     assert count == 1
     engine.dispose()
+
+
+def test_neon_dev_upgrade_creates_all_tables(neon_dev_url: str):
+    """Live check against the ephemeral Neon branch (NEON_DEV)."""
+    cfg = _alembic_config(neon_dev_url)
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(neon_dev_url)
+    try:
+        tables = set(inspect(engine).get_table_names())
+        assert EXPECTED_TABLES.issubset(tables)
+        with engine.connect() as conn:
+            version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+        assert version == "001_initial"
+    finally:
+        engine.dispose()
+
+
+def test_neon_dev_upgrade_downgrade_upgrade_roundtrip(neon_dev_url: str):
+    cfg = _alembic_config(neon_dev_url)
+    command.upgrade(cfg, "head")
+    command.downgrade(cfg, "base")
+
+    engine = create_engine(neon_dev_url)
+    try:
+        tables = set(inspect(engine).get_table_names())
+        assert "lenders" not in tables
+        assert "transactions" not in tables
+    finally:
+        engine.dispose()
+
+    command.upgrade(cfg, "head")
+    engine = create_engine(neon_dev_url)
+    try:
+        tables = set(inspect(engine).get_table_names())
+        assert {"lenders", "borrowers", "pools", "partners", "transactions"}.issubset(tables)
+    finally:
+        engine.dispose()

@@ -22,6 +22,16 @@ class LoginIn(BaseModel):
     password: str
 
 
+class NeonSessionIn(BaseModel):
+    """Exchange a Neon Auth JWT for a CoinFish product session."""
+    token: str
+    role: str = ""
+    company_name: str = ""
+    contact_name: str = ""
+    company_number: str = ""
+    lender_tier: str = "retail"
+
+
 class AccountOut(BaseModel):
     id: int
     role: str

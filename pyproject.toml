@@ -15,6 +15,7 @@ dependencies = [
   "python-dotenv>=1.0",
   "xrpl-py>=5.0.0",
   "psycopg[binary]>=3.1",
+  "PyJWT[crypto]>=2.8",
 ]
 
 [dependency-groups]

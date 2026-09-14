@@ -1,10 +1,19 @@
 // Launch App mini-frontend: login / signup for lenders and borrowers.
-// Signup collects company details (for show only), then KYC (+ credit for
-// borrowers), wallet connect, then enter the product worlds. Mounted at /app.
-import { useState } from "react";
+// Signup collects company details, verifies work email with a Neon Auth OTP,
+// then KYC (+ credit for borrowers), wallet connect, then the product worlds.
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../shared/store.jsx";
 import { api } from "../../shared/api.js";
+import {
+  authClient,
+  neonAuthEnabled,
+  neonEmailSignIn,
+  neonJwt,
+  neonMessage,
+  neonVerifySignupOtp,
+  needsEmailVerification,
+} from "../../shared/neonAuth.js";
 import { Button, Field, Pill, VerifyLink, rlusd } from "../../shared/components/ui.jsx";
 import CheckButton from "../../shared/components/CheckButton.jsx";
 import DevnetBadge from "../../shared/components/DevnetBadge.jsx";
@@ -25,10 +34,31 @@ export default function AuthPage() {
   const [walletChoice, setWalletChoice] = useState("xaman");
   const [walletAddress, setWalletAddress] = useState("");
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [otpEmail, setOtpEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpPending, setOtpPending] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+  const [pendingJwt, setPendingJwt] = useState("");
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  const needCredit = role === "borrower";
+  const needCredit = (acct?.role || role) === "borrower";
   const kycDone = acct?.kyc_status === "passed";
+  useEffect(() => {
+    if (!account) return undefined;
+    setAcct(account);
+    if (account.role === "lender" || account.role === "borrower") setRole(account.role);
+  }, [account]);
+  useEffect(() => {
+    if (!account) return undefined;
+    let cancelled = false;
+    api.me().then((next) => {
+      if (cancelled || !next) return;
+      patchAccount(next);
+      setAcct(next);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [account?.id]);
   const creditDone = !needCredit || acct?.credit_status === "passed";
   const connectedWallet = wallet || (acct?.wallet_connected ? {
     xrpl_address: acct.xrpl_address,
@@ -38,24 +68,158 @@ export default function AuthPage() {
   } : null);
   const ready = acct && kycDone && creditDone && connectedWallet;
 
+  useEffect(() => {
+    if (resendIn <= 0) return undefined;
+    const t = setTimeout(() => setResendIn((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
+
+  async function beginOtp(email) {
+    setOtpEmail(email);
+    setOtp("");
+    setOtpPending(true);
+    setResendIn(30);
+  }
+
+  async function exchangeNeon(extra = {}, token) {
+    const jwt = await neonJwt(token);
+    const r = await api.neonSession({ token: jwt, ...extra });
+    login(r.token, r.account);
+    return r.account;
+  }
+
+  function neonProfile() {
+    return {
+      role,
+      company_name: form.company_name,
+      contact_name: form.contact_name,
+      company_number: form.company_number,
+      lender_tier: form.lender_tier,
+    };
+  }
+
+  async function finishNeon(jwt) {
+    const next = await exchangeNeon(neonProfile(), jwt);
+    const creditOk = next.role !== "borrower" || next.credit_status === "passed";
+    if (next.wallet_connected && next.kyc_status === "passed" && creditOk) {
+      enter(next);
+      return next;
+    }
+    setAcct(next);
+    return next;
+  }
+
   async function doSignup(e) {
     e.preventDefault();
     setErr("");
+    if (!pendingJwt && neonAuthEnabled && form.password.length < 8) {
+      setErr("Password must be at least 8 characters.");
+      return;
+    }
+    setBusy(true);
     try {
-      const r = await api.signup({ ...form, role });
-      login(r.token, r.account);
-      setAcct(r.account);
-    } catch (e) { setErr(e.message); }
+      if (pendingJwt) {
+        await finishNeon(pendingJwt);
+        setPendingJwt("");
+        return;
+      }
+      if (!neonAuthEnabled) {
+        const r = await api.signup({ ...form, role });
+        login(r.token, r.account);
+        setAcct(r.account);
+        return;
+      }
+      const name = form.contact_name.trim() || form.company_name.trim();
+      const result = await authClient.signUp.email({
+        name,
+        email: form.email,
+        password: form.password,
+      });
+      if (result.error) throw new Error(neonMessage(result));
+      await beginOtp(form.email);
+    } catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
   }
+
   async function doLogin(e) {
     e.preventDefault();
     setErr("");
+    setBusy(true);
     try {
-      const r = await api.login({ email: form.email, password: form.password });
-      login(r.token, r.account);
-      enter(r.account);
-    } catch (e) { setErr(e.message); }
+      if (!neonAuthEnabled) {
+        const r = await api.login({ email: form.email, password: form.password });
+        login(r.token, r.account);
+        enter(r.account);
+        return;
+      }
+      let jwt;
+      try {
+        jwt = await neonEmailSignIn(form.email, form.password);
+      } catch (ex) {
+        if (needsEmailVerification(ex)) {
+          await authClient.emailOtp.sendVerificationOtp({
+            email: form.email,
+            type: "email-verification",
+          });
+          await beginOtp(form.email);
+          return;
+        }
+        throw ex;
+      }
+      try {
+        await finishNeon(jwt);
+      } catch (ex) {
+        if (needsEmailVerification(ex)) {
+          await authClient.emailOtp.sendVerificationOtp({
+            email: form.email,
+            type: "email-verification",
+          });
+          await beginOtp(form.email);
+          return;
+        }
+        if (/company name is required/i.test(ex.message)) {
+          setPendingJwt(jwt);
+          setMode("signup");
+          setErr("Add your company name to finish this " + role + " account.");
+          return;
+        }
+        throw ex;
+      }
+    } catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
   }
+
+  async function doVerifyOtp(e) {
+    e.preventDefault();
+    setErr("");
+    setBusy(true);
+    try {
+      const jwt = await neonVerifySignupOtp({
+        email: otpEmail,
+        otp: otp.trim(),
+        password: form.password,
+      });
+      await finishNeon(jwt);
+      setOtpPending(false);
+    } catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
+  }
+
+  async function resendOtp() {
+    if (resendIn > 0 || !authClient) return;
+    setErr("");
+    setBusy(true);
+    try {
+      const result = await authClient.emailOtp.sendVerificationOtp({
+        email: otpEmail,
+        type: "email-verification",
+      });
+      if (result.error) throw new Error(neonMessage(result));
+      setResendIn(30);
+    } catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
+  }
+
   async function connect() {
     setErr("");
     let w;
@@ -64,8 +228,14 @@ export default function AuthPage() {
         api.connectWallet({ provider: walletChoice, address: walletAddress }),
         {
           title: "Connecting your XRPL wallet",
-          steps: ["Opening " + walletChoice + " signer", "Requesting signature",
-                  "Verifying account on Devnet", "Reading RLUSD balance"],
+          steps: [
+            "Opening " + walletChoice + " signer",
+            "Funding a Devnet faucet wallet",
+            "Setting the RLUSD trustline",
+            "Minting demo RLUSD",
+            "Issuing credentials on Devnet",
+            "Reading RLUSD balance",
+          ],
           success: "Wallet connected",
         },
       );
@@ -115,18 +285,84 @@ export default function AuthPage() {
         <RoleToggle role={role} setRole={setRole} />
         <div className="card w-full min-w-0 p-6 md:p-7">
           <div className="mb-5 flex gap-2 text-sm">
-            <TabBtn on={mode === "signup"} onClick={() => setMode("signup")}>Sign up</TabBtn>
-            <TabBtn on={mode === "login"} onClick={() => setMode("login")}>Log in</TabBtn>
-            <span className="ml-auto"><Pill tone={role === "lender" ? "accent" : "muted"}>{role}</Pill></span>
+            {!acct && (
+              <>
+                <TabBtn on={mode === "signup"} onClick={() => { setMode("signup"); setOtpPending(false); setErr(""); }}>Sign up</TabBtn>
+                <TabBtn on={mode === "login"} onClick={() => { setMode("login"); setOtpPending(false); setErr(""); }}>Log in</TabBtn>
+              </>
+            )}
+            <span className={acct ? "" : "ml-auto"}><Pill tone={(acct?.role || role) === "lender" ? "accent" : "muted"}>{acct?.role || role}</Pill></span>
           </div>
 
-          {mode === "login" ? (
+          {otpPending ? (
+            <form onSubmit={doVerifyOtp} className="space-y-3">
+              <div className="text-sm" style={{ color: "var(--fg-soft)" }}>
+                Enter the 6-digit code we sent to{" "}
+                <b style={{ color: "var(--fg)" }}>{otpEmail}</b> to confirm this email.
+              </div>
+              <Field
+                label="One-time code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                required
+              />
+              <Button className="w-full justify-center" disabled={busy || otp.length < 6}>
+                {busy ? "Verifying…" : "Verify email"}
+              </Button>
+              <div className="flex items-center justify-between text-xs" style={{ color: "var(--fg-soft)" }}>
+                <button
+                  type="button"
+                  className="underline-offset-2 hover:underline"
+                  onClick={() => { setOtpPending(false); setOtp(""); setErr(""); }}
+                >
+                  Use a different email
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || resendIn > 0}
+                  className="underline-offset-2 hover:underline disabled:no-underline disabled:opacity-60"
+                  onClick={resendOtp}
+                >
+                  {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
+                </button>
+              </div>
+            </form>
+          ) : acct ? (
+            <div className="space-y-3">
+              <div className="text-sm" style={{ color: "var(--fg-soft)" }}>
+                Welcome, <b style={{ color: "var(--fg)" }}>{acct.company_name}</b>. Finish onboarding:
+              </div>
+              <CheckButton label="KYC" done={kycDone}
+                onPass={async () => patchAndStore(await api.verifyKyc())} />
+              {needCredit && (
+                <CheckButton label="credit" done={creditDone}
+                  onPass={async () => patchAndStore(await api.verifyCredit())} />
+              )}
+              <WalletConnect
+                wallet={connectedWallet}
+                choice={walletChoice}
+                setChoice={setWalletChoice}
+                address={walletAddress}
+                setAddress={setWalletAddress}
+                onConnect={connect}
+              />
+              <Button className="w-full justify-center" disabled={!ready} onClick={() => enter()}>
+                Enter {acct.role || role} app →
+              </Button>
+            </div>
+          ) : mode === "login" ? (
             <form onSubmit={doLogin} className="space-y-3">
               <Field label="Work email" type="email" value={form.email} onChange={set("email")} required />
               <Field label="Password" type="password" value={form.password} onChange={set("password")} required />
-              <Button className="w-full justify-center">Log in</Button>
+              <Button className="w-full justify-center" disabled={busy}>
+                {busy ? "Signing in…" : "Log in"}
+              </Button>
             </form>
-          ) : !acct ? (
+          ) : (
             <form onSubmit={doSignup} className="space-y-3">
               <Field label="Company name" value={form.company_name} onChange={set("company_name")} required />
               <div className="grid grid-cols-2 gap-3">
@@ -134,7 +370,16 @@ export default function AuthPage() {
                 <Field label="Contact name" value={form.contact_name} onChange={set("contact_name")} />
               </div>
               <Field label="Work email" type="email" value={form.email} onChange={set("email")} required />
-              <Field label="Password" type="password" value={form.password} onChange={set("password")} required />
+              {!pendingJwt && (
+              <Field
+                label="Password"
+                type="password"
+                value={form.password}
+                onChange={set("password")}
+                minLength={neonAuthEnabled ? 8 : undefined}
+                required
+              />
+              )}
               {role === "lender" && (
                 <label className="block space-y-1.5">
                   <span
@@ -156,31 +401,17 @@ export default function AuthPage() {
                   </span>
                 </label>
               )}
-              <Button className="w-full justify-center">Create account</Button>
-            </form>
-          ) : (
-            <div className="space-y-3">
-              <div className="text-sm" style={{ color: "var(--fg-soft)" }}>
-                Welcome, <b style={{ color: "var(--fg)" }}>{acct.company_name}</b>. Finish onboarding:
-              </div>
-              <CheckButton label="KYC" done={kycDone}
-                onPass={async () => patchAndStore(await api.verifyKyc())} />
-              {needCredit && (
-                <CheckButton label="credit" done={creditDone}
-                  onPass={async () => patchAndStore(await api.verifyCredit())} />
-              )}
-              <WalletConnect
-                wallet={connectedWallet}
-                choice={walletChoice}
-                setChoice={setWalletChoice}
-                address={walletAddress}
-                setAddress={setWalletAddress}
-                onConnect={connect}
-              />
-              <Button className="w-full justify-center" disabled={!ready} onClick={() => enter()}>
-                Enter {role} app →
+              <Button className="w-full justify-center" disabled={busy}>
+                {pendingJwt
+                  ? (busy ? "Saving…" : "Finish account")
+                  : (busy ? "Sending code…" : neonAuthEnabled ? "Send verification code" : "Create account")}
               </Button>
-            </div>
+              {!neonAuthEnabled && (
+                <p className="text-xs" style={{ color: "var(--fg-soft)" }}>
+                  Email OTP is off until Neon Auth is configured.
+                </p>
+              )}
+            </form>
           )}
           {err && <div className="mt-3 text-sm" style={{ color: "var(--bad)" }}>{err}</div>}
         </div>

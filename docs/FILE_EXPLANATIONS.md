@@ -80,7 +80,11 @@ Implements the onboarding journey:
 - provider-style XRPL wallet connection;
 - current account lookup.
 
-There is no real email verification, KYC provider, credit bureau, or wallet SDK
+When `VITE_NEON_AUTH_URL` is set, signup/login go through Neon Managed Better
+Auth. Neon emails a one-time code; FastAPI then exchanges the verified JWT for
+a CoinFish session. Demo email/password signup remains if Auth is not configured.
+
+There is no real KYC provider, credit bureau, or wallet SDK
 integration yet. The wallet flow records a chosen XRPL provider such as Xaman or
 Crossmark, the connected address, and a demo balance so it behaves like a signer
 connection without requiring a browser extension during the proof of concept.

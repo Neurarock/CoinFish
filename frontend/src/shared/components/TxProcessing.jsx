@@ -35,7 +35,8 @@ export function TxProvider({ children }) {
     const theme = themed ? [...themed.classList].find((c) => c.startsWith("theme-")) || "" : "";
     clearTimers();
     setSt({ title: opts.title || "Submitting to XRPL", steps, idx: 0, status: "running",
-            theme, message: "", explorerUrl: "", successLabel: opts.success || "Confirmed on XRPL Devnet" });
+            theme, message: "", explorerUrl: "", waiting: false,
+            successLabel: opts.success || "Confirmed on XRPL Devnet" });
 
     // Dwell on the early steps and hold on the second-to-last one until the
     // promise settles — so the final step only completes when the tx actually
@@ -45,6 +46,10 @@ export function TxProvider({ children }) {
         ? { ...s, idx: s.idx + 1 } : s));
     }, stepMs);
     timers.current.push(iv);
+    const waitHint = setTimeout(() => {
+      setSt((s) => (s && s.status === "running" ? { ...s, waiting: true } : s));
+    }, opts.waitHintMs ?? 4000);
+    timers.current.push(waitHint);
 
     try {
       const res = await promise;
@@ -73,7 +78,7 @@ export function TxProvider({ children }) {
 }
 
 function Overlay({ st, onClose }) {
-  const { title, steps, idx, status, message, explorerUrl, successLabel, theme } = st;
+  const { title, steps, idx, status, message, explorerUrl, successLabel, theme, waiting } = st;
   return (
     <div className={`tx-scrim ${theme || ""}`} onClick={status !== "running" ? onClose : undefined}>
       <div className="tx-card morph-edge" onClick={(e) => e.stopPropagation()}>
@@ -88,7 +93,9 @@ function Overlay({ st, onClose }) {
             <div className="text-xs" style={{ color: "var(--fg-soft)" }}>
               {status === "error"
                 ? "No funds moved — you can safely retry."
-                : "Running on the XRP Ledger · Devnet"}
+                : waiting
+                  ? "Waiting on XRPL Devnet — faucet + a few ledger txs, often 30–90s. Keep this tab open."
+                  : "Running on the XRP Ledger · Devnet"}
             </div>
           </div>
         </div>

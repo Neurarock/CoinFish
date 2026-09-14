@@ -13,11 +13,17 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 import os
+from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
 from sqlalchemy import text
 from sqlalchemy.pool import NullPool
 from sqlmodel import Field, Session, SQLModel, create_engine
+
+_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(_ROOT / ".env")
+load_dotenv(_ROOT / ".env.local", override=True)
 
 
 def _resolve_db_url() -> str:
@@ -85,6 +91,7 @@ class Account(SQLModel, table=True):
     company_name: str
     email: str = Field(index=True)
     password_hash: str = ""
+    neon_user_id: str = ""           # Managed Better Auth user id (empty = demo password account)
     # signup gating buttons (orange -> green in the UI)
     kyc_status: CheckStatus = CheckStatus.PENDING
     credit_status: CheckStatus = CheckStatus.PENDING
@@ -199,12 +206,14 @@ def _ensure_account_columns() -> None:
         "wallet_rlusd_balance": "FLOAT DEFAULT 0.0",
         "wallet_connected_at": "DATETIME",
         "lender_tier": "VARCHAR DEFAULT 'retail'",
+        "neon_user_id": "VARCHAR DEFAULT ''",
     }
     pg_adds = {
         "wallet_provider": "VARCHAR DEFAULT ''",
         "wallet_rlusd_balance": "DOUBLE PRECISION DEFAULT 0.0",
         "wallet_connected_at": "TIMESTAMP",
         "lender_tier": "VARCHAR DEFAULT 'retail'",
+        "neon_user_id": "VARCHAR DEFAULT ''",
     }
     with engine.begin() as conn:
         if engine.dialect.name == "sqlite":

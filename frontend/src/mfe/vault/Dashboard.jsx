@@ -17,10 +17,11 @@ export default function VaultDashboard() {
   const [acc, setAcc] = useState(null);
   const [hours, setHours] = useState({});
   const [txs, setTxs] = useState([]);
+  const [loadErr, setLoadErr] = useState("");
   const { track } = useTx();
 
   const load = () => {
-    api.adminDashboard().then(setD);
+    api.adminDashboard().then((next) => { setD(next); setLoadErr(""); }).catch((e) => setLoadErr(e.message));
     api.adminAccounts().then(setAcc).catch(() => setAcc(null));
     api.allTransactions().then(setTxs).catch(() => setTxs([]));
   };
@@ -51,6 +52,15 @@ export default function VaultDashboard() {
     } catch { /* overlay shows the error (e.g. not past grace yet) */ }
   }
 
+  if (loadErr && !d) {
+    return (
+      <Layout role="admin">
+        <div className="px-1 py-10 text-sm" style={{ color: "var(--bad)" }}>
+          Could not load the vault ledger: {loadErr}
+        </div>
+      </Layout>
+    );
+  }
   if (!d) return <Layout role="admin"><div className="px-1 py-10" style={{ color: "var(--fg-soft)" }}>Loading ledger…</div></Layout>;
 
   return (

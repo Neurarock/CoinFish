@@ -44,6 +44,9 @@ STABLECOIN_HEX = currency_hex(STABLECOIN_CODE)
 ISSUER_SEED = os.getenv("COINFISH_ISSUER_SEED", "")      # issues RLUSD
 OPERATOR_SEED = os.getenv("COINFISH_OPERATOR_SEED", "")  # vault owner / loan broker / credential issuer
 
+# Neon Managed Better Auth (email + OTP). JWKS lives at {url}/.well-known/jwks.json.
+NEON_AUTH_BASE_URL = (os.getenv("NEON_AUTH_BASE_URL") or "").rstrip("/")
+
 
 # --- Economics ---------------------------------------------------------------
 # Fee + risk parameters expressed as fractions (0.03 == 3%).

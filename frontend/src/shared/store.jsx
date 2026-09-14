@@ -34,6 +34,7 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    import("./neonAuth.js").then((m) => m.neonSignOut()).catch(() => {});
     setTok(null);
     setToken(null);
     setAccount(null);

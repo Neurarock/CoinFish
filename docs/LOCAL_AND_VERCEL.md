@@ -109,6 +109,9 @@ Useful variables:
   Devnet throwaway setup values.
 - `COINFISH_POOL_LOW_VAULT_ID`, `COINFISH_POOL_LOW_LOAN_BROKER_ID`, and the same
   pattern for `MED` and `HIGH`: pool ids for Vercel env-only setup.
+- `NEON_AUTH_BASE_URL`: Managed Better Auth URL (server JWT verification).
+- `VITE_NEON_AUTH_URL`: same Auth URL, exposed to the Vite app for signup/login
+  OTP. Without it the UI keeps demo email/password signup.
 
 See the root [`.env.example`](../.env.example) for the full template.
 

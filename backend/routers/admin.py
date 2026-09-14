@@ -50,6 +50,7 @@ def _risk_score() -> tuple[float, str]:
 @router.get("/dashboard", response_model=AdminDashboardOut)
 def dashboard(session: Session = Depends(session_dep)) -> AdminDashboardOut:
     # NOTE: admin auth is relaxed for the demo; gate with admin_only in prod.
+    rt.refresh_liquidity()
     total_tvl = round(sum(p.tvl for p in rt.pools.values()), 2)
     total_drawn = round(sum(p.drawn for p in rt.pools.values()), 2)
     total_flc = round(sum(p.first_loss_capital for p in rt.pools.values()), 2)

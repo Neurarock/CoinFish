@@ -15,7 +15,8 @@ from sqlmodel import Session, select
 
 from ..db import Account, CheckStatus, Role
 from ..runtime import rt
-from ..schemas import AccountOut, LoginIn, SignupIn, TokenOut, WalletConnectIn, WalletOut
+from ..neon_auth import verify_neon_token
+from ..schemas import AccountOut, LoginIn, NeonSessionIn, SignupIn, TokenOut, WalletConnectIn, WalletOut
 from ..services import (
     account_out,
     current_account,
@@ -63,6 +64,54 @@ def login(body: LoginIn, session: Session = Depends(session_dep)) -> TokenOut:
     acct = session.exec(select(Account).where(Account.email == body.email)).first()
     if not acct or not verify_password(body.password, acct.password_hash):
         raise HTTPException(401, "invalid credentials")
+    return TokenOut(token=issue_token(acct.id, session), account=account_out(acct))
+
+
+@router.post("/neon", response_model=TokenOut)
+def neon_session(body: NeonSessionIn, session: Session = Depends(session_dep)) -> TokenOut:
+    """Verify a Neon Auth JWT, then create or resume the CoinFish account."""
+    identity = verify_neon_token(body.token)
+    if not identity.email_verified:
+        raise HTTPException(403, "verify your email with the one-time code before continuing")
+
+    acct = session.exec(select(Account).where(Account.neon_user_id == identity.user_id)).first()
+    if not acct:
+        acct = session.exec(select(Account).where(Account.email == identity.email)).first()
+        if acct:
+            if acct.neon_user_id and acct.neon_user_id != identity.user_id:
+                raise HTTPException(409, "email is already linked to another identity")
+            acct.neon_user_id = identity.user_id
+            acct.email = identity.email
+            session.add(acct)
+            session.commit()
+            session.refresh(acct)
+
+    if not acct:
+        # Neon Auth's JWT role is "user" / "authenticated". CoinFish role is
+        # lender|borrower and must come from the Launch App toggle.
+        role_key = (body.role or "").strip().lower()
+        if role_key not in ("lender", "borrower"):
+            raise HTTPException(400, "role must be 'lender' or 'borrower'")
+        company = body.company_name.strip() or identity.name
+        if not company:
+            raise HTTPException(400, "company name is required to create an account")
+        role = Role(role_key)
+        from .. import config
+        tier = body.lender_tier if body.lender_tier in config.LENDER_TIERS else "retail"
+        acct = Account(
+            role=role,
+            company_name=company,
+            email=identity.email,
+            password_hash="",
+            neon_user_id=identity.user_id,
+            kyc_status=CheckStatus.PENDING,
+            credit_status=CheckStatus.NOT_REQUIRED if role == Role.LENDER else CheckStatus.PENDING,
+            lender_tier=tier if role == Role.LENDER else "retail",
+        )
+        session.add(acct)
+        session.commit()
+        session.refresh(acct)
+
     return TokenOut(token=issue_token(acct.id, session), account=account_out(acct))
 
 

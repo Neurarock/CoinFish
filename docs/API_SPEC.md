@@ -164,6 +164,32 @@ Request:
 { "email": "ops@example.test", "password": "demo-pass" }
 ```
 
+### `POST /auth/neon`
+
+Exchanges a Neon Managed Better Auth JWT for a CoinFish product session. The
+email on the token must already be verified (signup OTP). First call for a new
+user must include company profile fields; later calls resume the linked account.
+
+Request (new account):
+
+```json
+{
+  "token": "eyJhbGciOiJFZERTQSIs...",
+  "role": "borrower",
+  "company_name": "Example Trading Ltd",
+  "contact_name": "Ava Shah",
+  "company_number": "12345678"
+}
+```
+
+Request (returning user):
+
+```json
+{ "token": "eyJhbGciOiJFZERTQSIs..." }
+```
+
+`503` if `NEON_AUTH_BASE_URL` is unset. `403` if the email is not verified.
+
 ### `GET /auth/me`
 
 Returns the current account. Used to restore session state after refresh.

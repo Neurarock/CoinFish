@@ -29,6 +29,7 @@ export const api = {
   // auth + onboarding
   signup: (b) => req("POST", "/auth/signup", b),
   login: (b) => req("POST", "/auth/login", b),
+  neonSession: (b) => req("POST", "/auth/neon", b),
   me: () => req("GET", "/auth/me"),
   verifyKyc: () => req("POST", "/auth/verify/kyc"),
   verifyCredit: () => req("POST", "/auth/verify/credit"),

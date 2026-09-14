@@ -31,6 +31,10 @@ app.add_middleware(
 
 @app.on_event("startup")
 def _startup() -> None:
+    from urllib.parse import urlparse
+    parsed = urlparse(db.DB_URL)
+    target = parsed.hostname or parsed.path or "unknown"
+    print(f"CoinFish DB → {db.engine.dialect.name} ({target})")
     db.init_db()
 
 

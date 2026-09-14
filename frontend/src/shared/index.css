@@ -117,6 +117,141 @@ body {
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
+.app-vault-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  height: 2rem;
+  box-sizing: border-box;
+  padding: 0 0.85rem 0 0.7rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-decoration: none;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, filter 0.2s ease;
+}
+.app-vault-badge:hover {
+  background: color-mix(in srgb, var(--fg) 13%, transparent);
+  border-color: color-mix(in srgb, var(--fg) 26%, transparent);
+}
+.app-vault-badge-icon {
+  flex: none;
+  opacity: 0.95;
+}
+.app-vault-badge-arrow {
+  opacity: 0.85;
+  font-size: 0.85em;
+  line-height: 1;
+}
+.home-page .devnet-badge {
+  height: 2rem;
+  box-sizing: border-box;
+}
+
+.role-toggle {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  padding: 0.22rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--fg) 5%, var(--bg-soft));
+  border: 1px solid color-mix(in srgb, var(--line) 88%, var(--fg-soft));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent);
+}
+.role-toggle-thumb {
+  position: absolute;
+  z-index: 0;
+  top: 0.22rem;
+  bottom: 0.22rem;
+  left: 0.22rem;
+  width: calc((100% - 0.44rem) / 2);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(120deg, var(--accent), var(--accent-2));
+  background-size: 180% 180%;
+  animation: morph-pan 9s ease-in-out infinite;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 28%, transparent);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.role-toggle[data-role="borrower"] .role-toggle-thumb {
+  transform: translateX(100%);
+}
+.role-toggle button {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  padding: 0.58rem 1rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--fg-soft);
+  border-radius: var(--radius-pill);
+  transition: color 0.2s ease;
+}
+.role-toggle button[aria-selected="true"] {
+  color: var(--accent-fg);
+}
+
+.app-select-wrap {
+  position: relative;
+  display: block;
+}
+.app-select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  width: 0.42rem;
+  height: 0.42rem;
+  pointer-events: none;
+  border-right: 1.6px solid var(--fg-soft);
+  border-bottom: 1.6px solid var(--fg-soft);
+  transform: translateY(-70%) rotate(45deg);
+  opacity: 0.7;
+}
+.app-select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-width: 0;
+  padding: 0.78rem 2.4rem 0.78rem 1rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, var(--fg-soft));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fg) 4%, transparent), transparent 42%),
+    color-mix(in srgb, var(--bg-soft) 72%, var(--bg));
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 520;
+  letter-spacing: -0.015em;
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent),
+    0 1px 2px color-mix(in srgb, var(--fg) 4%, transparent);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.app-select:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+.app-select:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
 .card {
   background: var(--bg-soft);
   border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
@@ -154,6 +289,7 @@ body {
 
 .input {
   width: 100%;
+  min-width: 0;
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--line);
@@ -389,5 +525,5 @@ body {
 
 html, body, .app-bg { cursor: url("/cursor-fish.png") 12 10, auto; }
 a, button, .btn, label, summary, select, [role="button"], .pill, .verify-link,
-.devnet-badge, [onclick] { cursor: url("/cursor-fish.png") 12 10, pointer; }
+.devnet-badge, .app-vault-badge, .app-select, [onclick] { cursor: url("/cursor-fish.png") 12 10, pointer; }
 input, textarea { cursor: url("/cursor-fish.png") 12 10, text; }

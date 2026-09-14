@@ -94,40 +94,26 @@ export default function AuthPage() {
           <Logo size={44} to="/" />
           <span>CoinFish</span>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-1">
-          <Link to="/" className="app-nav-link" style={{ color: "var(--fg-soft)" }}>
-            Company
-          </Link>
-          <Link to="/partners" className="app-nav-link" style={{ color: "var(--fg-soft)" }}>
-            Partner Portal
-          </Link>
-          <Link to="/vault" className="app-nav-link" style={{ color: "var(--fg-soft)" }}>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link to="/vault" className="app-vault-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" className="app-vault-badge-icon">
+              <path
+                fill="currentColor"
+                d="M12 2.25a4.75 4.75 0 0 0-4.75 4.75V9H6.4A2.15 2.15 0 0 0 4.25 11.15v7.4A2.15 2.15 0 0 0 6.4 20.7h11.2a2.15 2.15 0 0 0 2.15-2.15v-7.4A2.15 2.15 0 0 0 17.6 9h-1.85V7A4.75 4.75 0 0 0 12 2.25ZM9.35 7A2.65 2.65 0 0 1 12 4.35 2.65 2.65 0 0 1 14.65 7v2H9.35V7ZM12 13.1a1.7 1.7 0 0 1 .85 3.18v1.22a.85.85 0 0 1-1.7 0v-1.22A1.7 1.7 0 0 1 12 13.1Z"
+              />
+            </svg>
             Vault
+            <span aria-hidden="true" className="app-vault-badge-arrow">↗</span>
           </Link>
-          <DevnetBadge />
+          <span className="hidden sm:inline-flex">
+            <DevnetBadge />
+          </span>
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-10 px-6 py-10 md:grid-cols-2 md:px-8">
-        {/* pitch side */}
-        <div className="space-y-5">
-          <p className="app-kicker">Launch App</p>
-          <h1 className="app-title text-4xl md:text-5xl">
-            Fiat-rich, crypto-poor?<br />
-            <span className="morph-text">Borrow on-chain in seconds.</span>
-          </h1>
-          <p className="text-[1.05rem] leading-relaxed tracking-tight" style={{ color: "var(--fg-soft)" }}>
-            Lenders supply RLUSD into risk-tiered pools and earn yield. Borrowers post
-            fiat collateral off-chain and draw instant stablecoin loans on the XRP Ledger.
-          </p>
-          <div className="flex gap-2">
-            <RoleTab cur={role} val="lender" set={setRole} label="I'm a Lender" sub="bright & liquid" />
-            <RoleTab cur={role} val="borrower" set={setRole} label="I'm a Borrower" sub="fast & black" />
-          </div>
-        </div>
-
-        {/* form side */}
-        <div className="card p-6 md:p-7">
+      <div className="mx-auto flex w-full min-w-0 max-w-md flex-1 flex-col items-center justify-center gap-5 px-6 py-10 md:px-8">
+        <RoleToggle role={role} setRole={setRole} />
+        <div className="card w-full min-w-0 p-6 md:p-7">
           <div className="mb-5 flex gap-2 text-sm">
             <TabBtn on={mode === "signup"} onClick={() => setMode("signup")}>Sign up</TabBtn>
             <TabBtn on={mode === "login"} onClick={() => setMode("login")}>Log in</TabBtn>
@@ -150,15 +136,24 @@ export default function AuthPage() {
               <Field label="Work email" type="email" value={form.email} onChange={set("email")} required />
               <Field label="Password" type="password" value={form.password} onChange={set("password")} required />
               {role === "lender" && (
-                <label className="block space-y-1">
-                  <span className="text-xs font-semibold" style={{ color: "var(--fg-soft)" }}>
-                    Accreditation tier (gates which pools you can fund)
+                <label className="block space-y-1.5">
+                  <span
+                    className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em]"
+                    style={{ color: "var(--fg-soft)" }}
+                  >
+                    Accreditation tier
                   </span>
-                  <select className="input" value={form.lender_tier} onChange={set("lender_tier")}>
-                    <option value="retail">Retail — Conservative pool only</option>
-                    <option value="professional">Professional — Conservative + Balanced</option>
-                    <option value="institutional">Institutional — all pools</option>
-                  </select>
+                  <span className="app-select-wrap">
+                    <select
+                      className="app-select"
+                      value={form.lender_tier}
+                      onChange={set("lender_tier")}
+                    >
+                      <option value="retail">Retail — Conservative pool only</option>
+                      <option value="professional">Professional — Conservative + Balanced</option>
+                      <option value="institutional">Institutional — all pools</option>
+                    </select>
+                  </span>
                 </label>
               )}
               <Button className="w-full justify-center">Create account</Button>
@@ -199,21 +194,27 @@ export default function AuthPage() {
   }
 }
 
-function RoleTab({ cur, val, set, label, sub }) {
-  const on = cur === val;
+function RoleToggle({ role, setRole }) {
   return (
-    <button
-      type="button"
-      onClick={() => set(val)}
-      className="card flex-1 p-3.5 text-left transition"
-      style={{
-        outline: on ? "2px solid var(--accent)" : "1px solid transparent",
-        outlineOffset: 0,
-      }}
-    >
-      <div className="font-semibold tracking-tight">{label}</div>
-      <div className="mt-0.5 text-xs tracking-tight" style={{ color: "var(--fg-soft)" }}>{sub}</div>
-    </button>
+    <div className="role-toggle" data-role={role} role="tablist" aria-label="Account type">
+      <span className="role-toggle-thumb" aria-hidden="true" />
+      <button
+        type="button"
+        role="tab"
+        aria-selected={role === "lender"}
+        onClick={() => setRole("lender")}
+      >
+        Lender
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={role === "borrower"}
+        onClick={() => setRole("borrower")}
+      >
+        Borrower
+      </button>
+    </div>
   );
 }
 function TabBtn({ on, ...p }) {

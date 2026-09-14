@@ -76,10 +76,11 @@ def neon_session(body: NeonSessionIn, session: Session = Depends(session_dep)) -
 
     acct = session.exec(select(Account).where(Account.neon_user_id == identity.user_id)).first()
     if not acct:
+        # Email is unique in Neon Auth. A verified JWT for this address is the
+        # current owner — including after the Neon user was deleted and the
+        # same email signed up again with a new user id.
         acct = session.exec(select(Account).where(Account.email == identity.email)).first()
-        if acct:
-            if acct.neon_user_id and acct.neon_user_id != identity.user_id:
-                raise HTTPException(409, "email is already linked to another identity")
+        if acct and acct.neon_user_id != identity.user_id:
             acct.neon_user_id = identity.user_id
             acct.email = identity.email
             session.add(acct)

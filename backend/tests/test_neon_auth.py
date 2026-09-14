@@ -91,6 +91,40 @@ def test_neon_session_creates_account(monkeypatch):
         assert resumed.json()["account"]["id"] == body["account"]["id"]
 
 
+def test_neon_session_relinks_after_identity_recreation(monkeypatch):
+    identities = {
+        "old-jwt": NeonIdentity(
+            user_id="neon-old",
+            email="recreate@example.test",
+            email_verified=True,
+            name="Ops",
+        ),
+        "new-jwt": NeonIdentity(
+            user_id="neon-new",
+            email="recreate@example.test",
+            email_verified=True,
+            name="Ops",
+        ),
+    }
+    monkeypatch.setattr(
+        "backend.routers.auth.verify_neon_token",
+        lambda token: identities[token],
+    )
+    from backend.main import app
+    with TestClient(app) as c:
+        created = c.post("/auth/neon", json={
+            "token": "old-jwt",
+            "role": "lender",
+            "company_name": "Relink Ltd",
+        })
+        assert created.status_code == 200, created.text
+        account_id = created.json()["account"]["id"]
+
+        resumed = c.post("/auth/neon", json={"token": "new-jwt"})
+        assert resumed.status_code == 200, resumed.text
+        assert resumed.json()["account"]["id"] == account_id
+
+
 def test_neon_session_login_uses_coinfish_role_not_neon_user(monkeypatch):
     monkeypatch.setattr(
         "backend.routers.auth.verify_neon_token",

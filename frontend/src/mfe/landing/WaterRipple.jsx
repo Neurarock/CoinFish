@@ -1,6 +1,28 @@
 // Cursor-driven water heightfield. Exposes drop(x,y,strength) for hero jumps.
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
+const DEEP = [6, 16, 24];
+const MID = [14, 58, 74];
+const LIGHT = [56, 168, 186];
+const FOAM = [186, 230, 236];
+const FADE_LIFT = 0.85;
+
+function fadeBase(tFromTop) {
+  const lift = (1 - tFromTop) * FADE_LIFT;
+  return [
+    DEEP[0] + (MID[0] - DEEP[0]) * lift,
+    DEEP[1] + (MID[1] - DEEP[1]) * lift,
+    DEEP[2] + (MID[2] - DEEP[2]) * lift,
+  ];
+}
+
+function rgbHex(rgb) {
+  return `#${rgb.map((n) => (n | 0).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Top-row pool colour (fade at y = 0). Used for iOS status-bar / notch fill. */
+export const WATER_TOP_HEX = rgbHex(fadeBase(0));
+
 const WaterRipple = forwardRef(function WaterRipple(_, ref) {
   const canvasRef = useRef(null);
   const dropRef = useRef(null);
@@ -39,10 +61,9 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
     let smoothY = -1;
     let lastTs = 0;
 
-    const deep = [6, 16, 24];
-    const mid = [14, 58, 74];
-    const light = [56, 168, 186];
-    const foam = [186, 230, 236];
+    const deep = DEEP;
+    const light = LIGHT;
+    const foam = FOAM;
 
     const CELL = 4;
 
@@ -118,10 +139,7 @@ const WaterRipple = forwardRef(function WaterRipple(_, ref) {
       const fadeSpan = Math.max(1, rows - 1);
       for (let y = 0; y < rows; y++) {
         const row = y * cols;
-        const lift = (1 - y / fadeSpan) * 0.85;
-        const baseR = deep[0] + (mid[0] - deep[0]) * lift;
-        const baseG = deep[1] + (mid[1] - deep[1]) * lift;
-        const baseB = deep[2] + (mid[2] - deep[2]) * lift;
+        const [baseR, baseG, baseB] = fadeBase(y / fadeSpan);
         for (let x = 0; x < cols; x++) {
           const i = row + x;
           const o = i * 4;

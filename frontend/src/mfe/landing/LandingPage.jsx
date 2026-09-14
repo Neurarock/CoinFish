@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Logo from "../../shared/components/Logo.jsx";
 import DevnetBadge from "../../shared/components/DevnetBadge.jsx";
-import WaterRipple from "./WaterRipple.jsx";
+import WaterRipple, { WATER_TOP_HEX } from "./WaterRipple.jsx";
 import TriangleJump from "./TriangleJump.jsx";
 import PolkaWave from "./PolkaWave.jsx";
 import PartnerBadgeFrost from "./PartnerBadgeFrost.jsx";
@@ -96,6 +96,33 @@ export default function LandingPage() {
     );
     io.observe(el);
     return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const prevRoot = root.style.backgroundColor;
+    const prevBody = body.style.backgroundColor;
+    root.style.backgroundColor = WATER_TOP_HEX;
+    body.style.backgroundColor = WATER_TOP_HEX;
+
+    let meta = document.querySelector('meta[name="theme-color"]');
+    const createdMeta = !meta;
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.setAttribute("name", "theme-color");
+      document.head.appendChild(meta);
+    }
+    const prevTheme = meta.getAttribute("content");
+    meta.setAttribute("content", WATER_TOP_HEX);
+
+    return () => {
+      root.style.backgroundColor = prevRoot;
+      body.style.backgroundColor = prevBody;
+      if (createdMeta) meta.remove();
+      else if (prevTheme == null) meta.removeAttribute("content");
+      else meta.setAttribute("content", prevTheme);
+    };
   }, []);
 
   useEffect(() => {

@@ -23,11 +23,43 @@ from . import config
 from .exit_queue import ExitQueue
 
 LIVE_CHAIN = True
-SETUP_PATH = Path(os.getenv("COINFISH_SETUP_JSON", "setup.json"))
-# Committed, non-secret object IDs (vault/broker/issuer/domain) so a deployed
-# backend without the gitignored setup.json still knows the pool IDs. Secret
-# seeds always come from env vars or the local setup.json — never from here.
-PUBLIC_SETUP_PATH = Path(os.getenv("COINFISH_PUBLIC_SETUP_JSON", "setup.public.json"))
+_BACKEND_DIR = Path(__file__).resolve().parent
+_ROOT = _BACKEND_DIR.parent
+
+
+def _path_from_env(env_name: str) -> Path | None:
+    raw = (os.getenv(env_name) or "").strip()
+    if not raw:
+        return None
+    path = Path(raw)
+    return path if path.is_absolute() else _ROOT / path
+
+
+def _first_existing(paths: list[Path]) -> Path:
+    for path in paths:
+        if path.exists():
+            return path
+    return paths[-1]
+
+
+# Relative setup.json paths used to resolve against cwd, which is not the repo
+# root on Vercel. Resolve from the package / repo so packaged public IDs load.
+def setup_path() -> Path:
+    return _path_from_env("COINFISH_SETUP_JSON") or (_ROOT / "setup.json")
+
+
+def public_setup_path() -> Path:
+    # Committed, non-secret object IDs (vault/broker/issuer/domain) so a deployed
+    # backend without the gitignored setup.json still knows the pool IDs. Secret
+    # seeds always come from env vars or the local setup.json — never from here.
+    return _path_from_env("COINFISH_PUBLIC_SETUP_JSON") or _first_existing([
+        _BACKEND_DIR / "setup_public.json",
+        _ROOT / "setup.public.json",
+    ])
+
+
+SETUP_PATH = _ROOT / "setup.json"
+PUBLIC_SETUP_PATH = _BACKEND_DIR / "setup_public.json"
 
 
 @dataclass
@@ -133,10 +165,12 @@ class Runtime:
     def _load_setup(self) -> None:
         # base: committed public IDs (no secrets); then the local gitignored
         # setup.json (full, incl. seeds); then env vars take final precedence.
-        if PUBLIC_SETUP_PATH.exists():
-            self._apply_setup(json.loads(PUBLIC_SETUP_PATH.read_text()))
-        if SETUP_PATH.exists():
-            self._apply_setup(json.loads(SETUP_PATH.read_text()))
+        public = public_setup_path()
+        secret = setup_path()
+        if public.exists():
+            self._apply_setup(json.loads(public.read_text()))
+        if secret.exists():
+            self._apply_setup(json.loads(secret.read_text()))
         for key, pr in self.pools.items():
             env_key = key.upper().replace("-", "_")
             pr.vault_id = os.getenv(f"COINFISH_POOL_{env_key}_VAULT_ID", pr.vault_id)

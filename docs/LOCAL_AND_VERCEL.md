@@ -111,7 +111,10 @@ Useful variables:
   pattern for `MED` and `HIGH`: pool ids for Vercel env-only setup.
 - `NEON_AUTH_BASE_URL`: Managed Better Auth URL (server JWT verification).
 - `VITE_NEON_AUTH_URL`: same Auth URL, exposed to the Vite app for signup/login
-  OTP. Without it the UI keeps demo email/password signup.
+  OTP. The Vite build also copies `NEON_AUTH_BASE_URL` onto this value when the
+  `VITE_` var is unset, so Preview still requires email OTP. Demo
+  email/password signup is local/CI only — Vercel Preview and Production reject
+  it.
 
 See the root [`.env.example`](../.env.example) for the full template.
 
@@ -120,10 +123,26 @@ On Vercel, `api/index.py` defaults `COINFISH_DB_URL` to
 ephemeral and can disappear on cold starts or redeploys. For durable deployed
 state, use a hosted database and set `COINFISH_DB_URL` (or `NEON`) to its URL.
 
+On Vercel Preview **and** Production, set both Auth URLs (or at least
+`NEON_AUTH_BASE_URL`) and the Devnet seeds. Public pool IDs ship in
+`backend/setup_public.json`; issuer/operator seeds do not. After a local
+bootstrap run:
+
+```bash
+uv run python -m backend.scripts.print_vercel_env
+```
+
+Paste `COINFISH_ISSUER_SEED` and `COINFISH_OPERATOR_SEED` (and the rest if you
+want env-only IDs) into the Vercel project for Preview and Production, then
+**redeploy**. Vite `VITE_*` values are baked in at build time.
+
+Add each Preview URL as a Neon Auth trusted origin or OTP emails will not
+complete.
+
 ## Notes
 
-- Real XRPL actions need Devnet setup values configured as Vercel environment
-  variables. There is no local synthetic transaction mode.
+- Real XRPL actions need Devnet setup values. Seeds must be Vercel environment
+  variables; public vault/broker IDs are committed in `backend/setup_public.json`.
 - The app rejects wallet/deposit/withdraw/loan/repay/default actions unless
   Devnet setup is complete.
 - SQLite is fine locally. Do not treat Vercel `/tmp` SQLite as production

@@ -67,6 +67,7 @@ htmlcov/
 coinfish.db
 setup.json
 setup.public.json
+# backend/setup_public.json is the committable public IDs (no seeds).
 
 # --- Misc legacy ---
 /.next/

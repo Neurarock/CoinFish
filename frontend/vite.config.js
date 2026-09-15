@@ -34,12 +34,31 @@ export function rewriteNeonCookieHeader(cookieHeader) {
   }).join("; ");
 }
 
+// Prefer the Vite-prefixed URL, then the server Auth URL. Vercel Preview often
+// has only NEON_AUTH_BASE_URL, and Vite will not expose that to the client
+// unless we copy it onto VITE_NEON_AUTH_URL at build time.
+export function resolveNeonAuthUrl(env = {}, processEnv = process.env) {
+  const raw = String(
+    env.VITE_NEON_AUTH_URL
+    || env.NEON_AUTH_BASE_URL
+    || processEnv.VITE_NEON_AUTH_URL
+    || processEnv.NEON_AUTH_BASE_URL
+    || "",
+  ).trim();
+  return raw.replace(/\/$/, "");
+}
+
+export function isVercelBuild(env = {}, processEnv = process.env) {
+  return Boolean(env.VERCEL || processEnv.VERCEL);
+}
+
 // The FastAPI backend runs on :8000; proxy /api there in dev so the frontend
 // can call the same-origin paths used in src/api.js. Neon Auth env vars live
 // in the repo-root .env (VITE_NEON_AUTH_URL is public; JWKS stays server-side).
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repoRoot, "");
-  const neonAuth = (env.NEON_AUTH_BASE_URL || env.VITE_NEON_AUTH_URL || "").replace(/\/$/, "");
+  const neonAuth = resolveNeonAuthUrl(env);
+  const requireOtp = isVercelBuild(env);
   const proxy = {
     "/api": {
       target: "http://localhost:8000",
@@ -71,6 +90,11 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     envDir: repoRoot,
+    envPrefix: ["VITE_", "NEON_AUTH_"],
+    define: {
+      "import.meta.env.VITE_NEON_AUTH_URL": JSON.stringify(neonAuth),
+      "import.meta.env.VITE_REQUIRE_EMAIL_OTP": JSON.stringify(requireOtp ? "true" : ""),
+    },
     server: {
       port: 5173,
       proxy,

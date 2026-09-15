@@ -144,3 +144,44 @@ def test_neon_session_login_uses_coinfish_role_not_neon_user(monkeypatch):
         account = created.json()["account"]
         assert account["role"] == "lender"
         assert account["company_name"] == "Jonathan"
+
+
+def test_allow_demo_auth_defaults_on_when_not_vercel(monkeypatch):
+    monkeypatch.delenv("VERCEL", raising=False)
+    monkeypatch.delenv("COINFISH_ALLOW_DEMO_AUTH", raising=False)
+    from backend.routers.auth import allow_demo_auth
+    assert allow_demo_auth() is True
+
+
+def test_allow_demo_auth_off_on_vercel(monkeypatch):
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.delenv("COINFISH_ALLOW_DEMO_AUTH", raising=False)
+    from backend.routers.auth import allow_demo_auth
+    assert allow_demo_auth() is False
+
+
+def test_demo_signup_blocked_on_vercel(monkeypatch):
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.delenv("COINFISH_ALLOW_DEMO_AUTH", raising=False)
+    from backend.main import app
+    with TestClient(app) as c:
+        resp = c.post("/auth/signup", json={
+            "role": "lender",
+            "company_name": "Preview Lender",
+            "email": "preview-otp-required@example.test",
+            "password": "demo-pass",
+        })
+    assert resp.status_code == 403
+    assert "one-time code" in resp.json()["detail"]
+
+
+def test_demo_login_blocked_on_vercel(monkeypatch):
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.delenv("COINFISH_ALLOW_DEMO_AUTH", raising=False)
+    from backend.main import app
+    with TestClient(app) as c:
+        resp = c.post("/auth/login", json={
+            "email": "preview-otp-required@example.test",
+            "password": "demo-pass",
+        })
+    assert resp.status_code == 403

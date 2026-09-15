@@ -71,7 +71,9 @@ def main() -> None:
         "domain_id": domain_id,            # borrower domain
         "pools": pools_out,
     }
-    # Write the full (secret) setup.json AND a committable public-only file.
+    # Write the full (secret) setup.json AND committable public-only files.
+    # backend/setup_public.json is packaged with the Vercel function so Preview
+    # still has vault/broker IDs when the gitignored root files are absent.
     Path("setup.json").write_text(json.dumps(out, indent=2))
     public = {
         "_comment": "PUBLIC Devnet object IDs only — no seeds. Safe to commit.",
@@ -82,8 +84,10 @@ def main() -> None:
                    "loan_broker_id": q["loan_broker_id"], "domain_id": q["domain_id"]}
                   for q in pools_out],
     }
-    Path("setup.public.json").write_text(json.dumps(public, indent=2))
-    print("\nWrote setup.json (secret) + setup.public.json (committable).")
+    public_text = json.dumps(public, indent=2)
+    Path("setup.public.json").write_text(public_text)
+    Path(__file__).resolve().parents[1].joinpath("setup_public.json").write_text(public_text)
+    print("\nWrote setup.json (secret) + setup.public.json and backend/setup_public.json (committable).")
     print("=== setup.json ===")
     print(json.dumps(out, indent=2))
 

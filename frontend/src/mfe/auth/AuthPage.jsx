@@ -8,6 +8,8 @@ import { api } from "../../shared/api.js";
 import {
   authClient,
   neonAuthEnabled,
+  requireEmailOtp,
+  OTP_REQUIRED_MESSAGE,
   neonEmailSignIn,
   neonJwt,
   neonMessage,
@@ -40,6 +42,7 @@ export default function AuthPage() {
   const [otpPending, setOtpPending] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [pendingJwt, setPendingJwt] = useState("");
+  const [devnet, setDevnet] = useState(null);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const needCredit = (acct?.role || role) === "borrower";
@@ -59,6 +62,13 @@ export default function AuthPage() {
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [account?.id]);
+  useEffect(() => {
+    let cancelled = false;
+    api.runtimeStatus().then((status) => {
+      if (!cancelled) setDevnet(status);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const creditDone = !needCredit || acct?.credit_status === "passed";
   const connectedWallet = wallet || (acct?.wallet_connected ? {
     xrpl_address: acct.xrpl_address,
@@ -112,7 +122,7 @@ export default function AuthPage() {
   async function doSignup(e) {
     e.preventDefault();
     setErr("");
-    if (!pendingJwt && neonAuthEnabled && form.password.length < 8) {
+    if (!pendingJwt && requireEmailOtp && form.password.length < 8) {
       setErr("Password must be at least 8 characters.");
       return;
     }
@@ -124,6 +134,7 @@ export default function AuthPage() {
         return;
       }
       if (!neonAuthEnabled) {
+        if (requireEmailOtp) throw new Error(OTP_REQUIRED_MESSAGE);
         const r = await api.signup({ ...form, role });
         login(r.token, r.account);
         setAcct(r.account);
@@ -147,6 +158,7 @@ export default function AuthPage() {
     setBusy(true);
     try {
       if (!neonAuthEnabled) {
+        if (requireEmailOtp) throw new Error(OTP_REQUIRED_MESSAGE);
         const r = await api.login({ email: form.email, password: form.password });
         login(r.token, r.account);
         enter(r.account);
@@ -349,6 +361,8 @@ export default function AuthPage() {
                 address={walletAddress}
                 setAddress={setWalletAddress}
                 onConnect={connect}
+                blocked={Boolean(devnet && !devnet.devnet_ready)}
+                warnings={devnet?.warnings || []}
               />
               <Button className="w-full justify-center" disabled={!ready} onClick={() => enter()}>
                 Enter {acct.role || role} app →
@@ -376,7 +390,7 @@ export default function AuthPage() {
                 type="password"
                 value={form.password}
                 onChange={set("password")}
-                minLength={neonAuthEnabled ? 8 : undefined}
+                minLength={requireEmailOtp ? 8 : undefined}
                 required
               />
               )}
@@ -404,11 +418,16 @@ export default function AuthPage() {
               <Button className="w-full justify-center" disabled={busy}>
                 {pendingJwt
                   ? (busy ? "Saving…" : "Finish account")
-                  : (busy ? "Sending code…" : neonAuthEnabled ? "Send verification code" : "Create account")}
+                  : (busy ? "Sending code…" : requireEmailOtp ? "Send verification code" : "Create account")}
               </Button>
-              {!neonAuthEnabled && (
+              {!neonAuthEnabled && !requireEmailOtp && (
                 <p className="text-xs" style={{ color: "var(--fg-soft)" }}>
                   Email OTP is off until Neon Auth is configured.
+                </p>
+              )}
+              {requireEmailOtp && !neonAuthEnabled && (
+                <p className="text-xs" style={{ color: "var(--bad)" }}>
+                  {OTP_REQUIRED_MESSAGE}
                 </p>
               )}
             </form>
@@ -469,7 +488,16 @@ const PROVIDERS = [
   ["devnet", "Devnet signer", "Demo faucet wallet"],
 ];
 
-function WalletConnect({ wallet, choice, setChoice, address, setAddress, onConnect }) {
+function WalletConnect({
+  wallet,
+  choice,
+  setChoice,
+  address,
+  setAddress,
+  onConnect,
+  blocked = false,
+  warnings = [],
+}) {
   if (wallet) {
     return (
       <div className="rounded-lg p-3" style={{ border: "1px solid var(--line)", background: "var(--bg)" }}>
@@ -510,7 +538,12 @@ function WalletConnect({ wallet, choice, setChoice, address, setAddress, onConne
         onChange={(e) => setAddress(e.target.value)}
         placeholder="Devnet faucet wallet is created if empty"
       />
-      <Button className="w-full justify-center" onClick={onConnect}>
+      {blocked && warnings.length > 0 && (
+        <p className="text-xs" style={{ color: "var(--bad)" }}>
+          Wallet connection needs a complete Devnet setup: {warnings.join("; ")}
+        </p>
+      )}
+      <Button className="w-full justify-center" onClick={onConnect} disabled={blocked}>
         Approve sign-in and connect
       </Button>
     </div>

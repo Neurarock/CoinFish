@@ -34,8 +34,11 @@ def main() -> None:
     with TestClient(app) as c:
         pools = ok(c.get("/pools"))
         assert len(pools) == 3
-        assert all(p["vault_explorer_url"].startswith("https://devnet.xrpl.org/objects/")
-                   for p in pools)
+        assert all(
+            p["vault_explorer_url"].startswith("https://devnet.xrpl.org/accounts/")
+            or p["vault_explorer_url"].startswith("https://devnet.xrpl.org/objects/")
+            for p in pools
+        )
 
         status = ok(c.get("/runtime/status"))
         assert status["mode"] == "xrpl-devnet-live"

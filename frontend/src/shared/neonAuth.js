@@ -1,9 +1,16 @@
-// Neon Managed Better Auth client. When VITE_NEON_AUTH_URL is unset, the app
-// keeps the demo email/password API so local/CI still work.
+// Neon Managed Better Auth client. When no Auth URL is baked into the build,
+// local/CI keep the demo email/password API. Vercel Preview/Production must
+// require OTP — vite.config.js copies NEON_AUTH_BASE_URL onto VITE_NEON_AUTH_URL
+// and sets VITE_REQUIRE_EMAIL_OTP so a missing Vite-prefixed var cannot silently
+// skip verification.
 import { createAuthClient } from "@neondatabase/neon-js/auth";
 import { BetterAuthReactAdapter } from "@neondatabase/neon-js/auth/react/adapters";
 
-const remoteUrl = (import.meta.env.VITE_NEON_AUTH_URL || "").trim().replace(/\/$/, "");
+const remoteUrl = (
+  import.meta.env.VITE_NEON_AUTH_URL
+  || import.meta.env.NEON_AUTH_BASE_URL
+  || ""
+).trim().replace(/\/$/, "");
 // Vite proxies /neon-auth → Neon so set-auth-jwt is readable same-origin.
 // Better Auth requires an absolute URL; a bare "/neon-auth" throws and blanks /app.
 // Production talks to Neon directly (Vercel cannot rewrite an env-specific Auth URL).
@@ -12,6 +19,11 @@ const url = remoteUrl && import.meta.env.DEV
   : remoteUrl;
 
 export const neonAuthEnabled = Boolean(remoteUrl);
+export const requireEmailOtp =
+  neonAuthEnabled || import.meta.env.VITE_REQUIRE_EMAIL_OTP === "true";
+
+export const OTP_REQUIRED_MESSAGE =
+  "Email verification is required. This deployment was built without Neon Auth. Set VITE_NEON_AUTH_URL or NEON_AUTH_BASE_URL and redeploy.";
 
 export const authClient = url
   ? createAuthClient(url, {

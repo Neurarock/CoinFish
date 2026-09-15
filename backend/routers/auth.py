@@ -8,6 +8,7 @@ an external provider and flip the stored status from pending (orange) to passed
 """
 from __future__ import annotations
 
+import os
 import random
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -33,8 +34,31 @@ from ..services import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def allow_demo_auth() -> bool:
+    """Password signup/login without OTP is local/CI only.
+
+    Vercel Preview and Production always require Neon Auth email verification.
+    Set COINFISH_ALLOW_DEMO_AUTH=1 only to force the demo path on a deploy.
+    """
+    flag = (os.getenv("COINFISH_ALLOW_DEMO_AUTH") or "").strip().lower()
+    if flag in ("0", "false", "no"):
+        return False
+    if flag in ("1", "true", "yes"):
+        return True
+    return not os.getenv("VERCEL")
+
+
+def _require_demo_auth() -> None:
+    if not allow_demo_auth():
+        raise HTTPException(
+            403,
+            "verify your email with the one-time code before continuing",
+        )
+
+
 @router.post("/signup", response_model=TokenOut)
 def signup(body: SignupIn, session: Session = Depends(session_dep)) -> TokenOut:
+    _require_demo_auth()
     if body.role not in ("lender", "borrower"):
         raise HTTPException(400, "role must be 'lender' or 'borrower'")
     existing = session.exec(select(Account).where(Account.email == body.email)).first()
@@ -61,6 +85,7 @@ def signup(body: SignupIn, session: Session = Depends(session_dep)) -> TokenOut:
 
 @router.post("/login", response_model=TokenOut)
 def login(body: LoginIn, session: Session = Depends(session_dep)) -> TokenOut:
+    _require_demo_auth()
     acct = session.exec(select(Account).where(Account.email == body.email)).first()
     if not acct or not verify_password(body.password, acct.password_hash):
         raise HTTPException(401, "invalid credentials")

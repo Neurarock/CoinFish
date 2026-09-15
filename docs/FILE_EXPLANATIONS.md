@@ -80,9 +80,11 @@ Implements the onboarding journey:
 - provider-style XRPL wallet connection;
 - current account lookup.
 
-When `VITE_NEON_AUTH_URL` is set, signup/login go through Neon Managed Better
-Auth. Neon emails a one-time code; FastAPI then exchanges the verified JWT for
-a CoinFish session. Demo email/password signup remains if Auth is not configured.
+When `VITE_NEON_AUTH_URL` or `NEON_AUTH_BASE_URL` is available at build time,
+signup/login go through Neon Managed Better Auth. Neon emails a one-time code;
+FastAPI then exchanges the verified JWT for a CoinFish session. Demo
+email/password signup remains for local/CI only; Vercel Preview and Production
+reject it so lender and borrower signup always require OTP.
 
 There is no real KYC provider, credit bureau, or wallet SDK
 integration yet. The wallet flow records a chosen XRPL provider such as Xaman or

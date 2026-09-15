@@ -1,9 +1,10 @@
 """Print the environment variables the deployed backend needs.
 
 `setup.json` is gitignored (it holds Devnet throwaway seeds), so the Vercel
-serverless backend can't read it — which is why pool vault/broker IDs come back
-empty ("—…") and on-chain actions can't sign. Run this locally and paste the
-output into Vercel → Project → Settings → Environment Variables (Production),
+serverless backend can't read it. Public vault/broker IDs ship in
+`backend/setup_public.json`, but issuer/operator seeds must still be set as
+environment variables. Run this locally and paste the output into Vercel →
+Project → Settings → Environment Variables for Preview and Production,
 or pipe it to a file and `vercel env add` each one.
 
     python -m backend.scripts.print_vercel_env

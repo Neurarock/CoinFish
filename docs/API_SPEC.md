@@ -114,7 +114,9 @@ Returns one pool. Used when a page needs to refresh a single card.
 
 Creates a lender or borrower company account and returns a demo session token.
 Inputs such as contact name and company number are captured to make the UX feel
-complete; they are not verified.
+complete; they are not verified. This demo path is local/CI only. On Vercel
+Preview and Production the API returns 403 and clients must verify email with
+Neon Auth OTP, then call `POST /auth/neon`.
 
 Request:
 

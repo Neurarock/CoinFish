@@ -22,6 +22,7 @@ from ..services import (
     collateral_locked,
     explorer_account,
     explorer_tx,
+    has_access,
     record_onchain_tx,
     require_devnet_transactions,
     require_role,
@@ -113,8 +114,11 @@ def accounts(session: Session = Depends(session_dep)) -> dict:
             "credential_id": a.credential_id or "",
             "credential_explorer_url": explorer_tx(a.credential_id) if a.credential_id else "",
             "wallet_rlusd_balance": round(a.wallet_rlusd_balance or 0.0, 2),
+            "can_lend": has_access(a, Role.LENDER),
+            "can_borrow": has_access(a, Role.BORROWER),
+            "can_partner": bool(a.can_partner),
         }
-        if a.role == Role.LENDER:
+        if has_access(a, Role.LENDER):
             deps = session.exec(select(Deposit).where(Deposit.account_id == a.id)).all()
             by_pool: dict[str, float] = {}
             for d in deps:
@@ -126,7 +130,7 @@ def accounts(session: Session = Depends(session_dep)) -> dict:
                 "eligible_pools": [k for k in rt.pools
                                    if config.lender_can_access(a.lender_tier or "retail", k)],
             }
-        else:
+        if has_access(a, Role.BORROWER):
             coll = collateral_balance(session, a.id)
             locked = collateral_locked(session, a.id)
             loans = session.exec(select(Loan).where(Loan.account_id == a.id)).all()
@@ -156,7 +160,7 @@ def accounts(session: Session = Depends(session_dep)) -> dict:
 
     # Per-pool access list: each pool gates by its own credential + min tier, so
     # the access list (eligible lenders) differs per pool.
-    lenders = [a for a in rows if a.role == Role.LENDER]
+    lenders = [a for a in rows if has_access(a, Role.LENDER)]
     pool_access = []
     for key, pool in rt.pools.items():
         members = [
@@ -180,7 +184,7 @@ def accounts(session: Session = Depends(session_dep)) -> dict:
 
     return {"permission": permission, "pool_access": pool_access, "accounts": out,
             "lenders": len(lenders),
-            "borrowers": sum(1 for a in rows if a.role == Role.BORROWER)}
+            "borrowers": sum(1 for a in rows if has_access(a, Role.BORROWER))}
 
 
 @router.post("/loans/grace")

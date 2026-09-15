@@ -240,7 +240,9 @@ export default function VaultDashboard() {
                   <div className="font-bold">{a.company_name}</div>
                   <div className="text-[11px]" style={{ color: "var(--fg-soft)" }}>{a.email} · KYC {a.kyc_status}</div>
                 </div>
-                <div><Pill tone={a.role === "lender" ? "good" : "warn"}>{a.role}</Pill></div>
+                <div><Pill tone={(a.can_lend && a.can_borrow) ? "accent" : (a.can_lend || a.role === "lender") ? "good" : "warn"}>{
+                  [a.can_lend && "lender", a.can_borrow && "borrower", a.can_partner && "partner"].filter(Boolean).join(" · ") || a.role
+                }</Pill></div>
                 <div className="text-xs">
                   {a.xrpl_address ? (
                     <a className="mono" href={a.account_explorer_url} target="_blank" rel="noreferrer"
@@ -254,9 +256,9 @@ export default function VaultDashboard() {
                   )}
                 </div>
                 <div className="text-right text-xs mono">
-                  {a.lending
-                    ? <span>{rlusd(a.lending.total_deposited)} supplied</span>
-                    : <span>{usd(a.borrowing.collateral_pledged)} pledged · {rlusd(a.borrowing.outstanding)} borrowed</span>}
+                  {a.lending && <div>{rlusd(a.lending.total_deposited)} supplied</div>}
+                  {a.borrowing && <div>{usd(a.borrowing.collateral_pledged)} pledged · {rlusd(a.borrowing.outstanding)} borrowed</div>}
+                  {!a.lending && !a.borrowing && <span style={{ color: "var(--fg-soft)" }}>—</span>}
                 </div>
               </div>
             ))}

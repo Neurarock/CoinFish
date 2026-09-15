@@ -12,6 +12,8 @@ actions to XRPL Devnet and records their explorer links.
 from __future__ import annotations
 
 import logging
+import os
+import threading
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
@@ -45,13 +47,28 @@ app.add_middleware(
 )
 
 
+def _init_db_safe() -> None:
+    try:
+        db.init_db()
+        print("CoinFish DB ready", flush=True)
+    except Exception:
+        _log.exception("Database init failed — API is listening but DB calls may error")
+
+
 @app.on_event("startup")
 def _startup() -> None:
     from urllib.parse import urlparse
     parsed = urlparse(db.DB_URL)
     target = parsed.hostname or parsed.path or "unknown"
-    print(f"CoinFish DB → {db.engine.dialect.name} ({target})")
-    db.init_db()
+    print(f"CoinFish DB → {db.engine.dialect.name} ({target})", flush=True)
+    # Uvicorn does not bind :8000 until startup returns. Neon compute wake +
+    # schema checks can take 30s+, which shows up as Vite proxy ETIMEDOUT.
+    # SQLite and Vercel stay inline so tests and serverless have a schema
+    # before the first request. Local Postgres init runs in the background.
+    if db.engine.dialect.name == "sqlite" or os.getenv("VERCEL"):
+        db.init_db()
+        return
+    threading.Thread(target=_init_db_safe, name="coinfish-init-db", daemon=True).start()
 
 
 @app.get("/")

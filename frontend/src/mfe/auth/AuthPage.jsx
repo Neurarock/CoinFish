@@ -15,12 +15,15 @@ import {
   neonMessage,
   neonVerifySignupOtp,
   needsEmailVerification,
+  alreadyRegistered,
+  alreadyVerified,
 } from "../../shared/neonAuth.js";
 import { Button, Field, Pill, VerifyLink, rlusd } from "../../shared/components/ui.jsx";
 import CheckButton from "../../shared/components/CheckButton.jsx";
 import DevnetBadge from "../../shared/components/DevnetBadge.jsx";
 import Logo from "../../shared/components/Logo.jsx";
 import { useTx } from "../../shared/components/TxProcessing.jsx";
+import { enterPath, hasAccess } from "../../shared/access.js";
 
 const THEME = { lender: "theme-lender", borrower: "theme-borrower" };
 
@@ -45,12 +48,11 @@ export default function AuthPage() {
   const [devnet, setDevnet] = useState(null);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  const needCredit = (acct?.role || role) === "borrower";
+  const needCredit = role === "borrower";
   const kycDone = acct?.kyc_status === "passed";
   useEffect(() => {
     if (!account) return undefined;
     setAcct(account);
-    if (account.role === "lender" || account.role === "borrower") setRole(account.role);
   }, [account]);
   useEffect(() => {
     if (!account) return undefined;
@@ -70,13 +72,15 @@ export default function AuthPage() {
     return () => { cancelled = true; };
   }, []);
   const creditDone = !needCredit || acct?.credit_status === "passed";
+  const requestedReady = hasAccess(acct, role);
   const connectedWallet = wallet || (acct?.wallet_connected ? {
     xrpl_address: acct.xrpl_address,
     provider: acct.wallet_provider,
     rlusd_balance: acct.wallet_rlusd_balance,
     explorer_url: acct.wallet_explorer_url,
   } : null);
-  const ready = acct && kycDone && creditDone && connectedWallet;
+  const onboardingDone = acct && kycDone && creditDone && connectedWallet;
+  const ready = onboardingDone && requestedReady;
 
   useEffect(() => {
     if (resendIn <= 0) return undefined;
@@ -110,13 +114,39 @@ export default function AuthPage() {
 
   async function finishNeon(jwt) {
     const next = await exchangeNeon(neonProfile(), jwt);
-    const creditOk = next.role !== "borrower" || next.credit_status === "passed";
-    if (next.wallet_connected && next.kyc_status === "passed" && creditOk) {
-      enter(next);
-      return next;
-    }
+    maybeEnter(next);
     setAcct(next);
     return next;
+  }
+
+  function maybeEnter(next, requested = role) {
+    const creditOk = requested !== "borrower" || next.credit_status === "passed";
+    if (hasAccess(next, requested) && next.wallet_connected && next.kyc_status === "passed" && creditOk) {
+      enter(next, requested);
+    }
+  }
+
+  async function continueExistingUser() {
+    try {
+      const jwt = await neonEmailSignIn(form.email, form.password);
+      await finishNeon(jwt);
+      setOtpPending(false);
+    } catch (ex) {
+      if (needsEmailVerification(ex)) {
+        const sent = await authClient.emailOtp.sendVerificationOtp({
+          email: form.email,
+          type: "email-verification",
+        });
+        if (sent.error) throw new Error(neonMessage(sent));
+        await beginOtp(form.email);
+        return;
+      }
+      setMode("login");
+      setOtpPending(false);
+      throw new Error(
+        "This email already has a CoinFish account. Log in — it's one company login, and you can extend access from there.",
+      );
+    }
   }
 
   async function doSignup(e) {
@@ -137,6 +167,7 @@ export default function AuthPage() {
         if (requireEmailOtp) throw new Error(OTP_REQUIRED_MESSAGE);
         const r = await api.signup({ ...form, role });
         login(r.token, r.account);
+        maybeEnter(r.account);
         setAcct(r.account);
         return;
       }
@@ -146,7 +177,24 @@ export default function AuthPage() {
         email: form.email,
         password: form.password,
       });
-      if (result.error) throw new Error(neonMessage(result));
+      if (result.error) {
+        if (alreadyRegistered(result)) {
+          await continueExistingUser();
+          return;
+        }
+        throw new Error(neonMessage(result));
+      }
+      const otpResult = await authClient.emailOtp.sendVerificationOtp({
+        email: form.email,
+        type: "email-verification",
+      });
+      if (otpResult.error) {
+        if (alreadyRegistered(otpResult) || alreadyVerified(otpResult)) {
+          await continueExistingUser();
+          return;
+        }
+        throw new Error(neonMessage(otpResult));
+      }
       await beginOtp(form.email);
     } catch (e) { setErr(e.message || String(e)); }
     finally { setBusy(false); }
@@ -161,7 +209,8 @@ export default function AuthPage() {
         if (requireEmailOtp) throw new Error(OTP_REQUIRED_MESSAGE);
         const r = await api.login({ email: form.email, password: form.password });
         login(r.token, r.account);
-        enter(r.account);
+        maybeEnter(r.account);
+        setAcct(r.account);
         return;
       }
       let jwt;
@@ -264,9 +313,19 @@ export default function AuthPage() {
     setAcct(next);
     patchAccount(next);
   }
-  function enter(a = acct) {
-    if (a.role === "lender") nav("/lender/deposit");
-    else nav("/borrower/collateral");
+  function enter(a = acct, requested = role) {
+    if (hasAccess(a, requested)) nav(enterPath(requested));
+  }
+
+  async function enableRequestedAccess() {
+    setErr("");
+    setBusy(true);
+    try {
+      const next = await api.enableAccess({ role, lender_tier: form.lender_tier });
+      patchAndStore(next);
+      enter(next, role);
+    } catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -303,7 +362,7 @@ export default function AuthPage() {
                 <TabBtn on={mode === "login"} onClick={() => { setMode("login"); setOtpPending(false); setErr(""); }}>Log in</TabBtn>
               </>
             )}
-            <span className={acct ? "" : "ml-auto"}><Pill tone={(acct?.role || role) === "lender" ? "accent" : "muted"}>{acct?.role || role}</Pill></span>
+            <span className={acct ? "" : "ml-auto"}><Pill tone={role === "lender" ? "accent" : "muted"}>{role}</Pill></span>
           </div>
 
           {otpPending ? (
@@ -346,13 +405,49 @@ export default function AuthPage() {
           ) : acct ? (
             <div className="space-y-3">
               <div className="text-sm" style={{ color: "var(--fg-soft)" }}>
-                Welcome, <b style={{ color: "var(--fg)" }}>{acct.company_name}</b>. Finish onboarding:
+                Welcome, <b style={{ color: "var(--fg)" }}>{acct.company_name}</b>.
+                {requestedReady
+                  ? " Finish onboarding, then enter."
+                  : " This is one company login — extra access is opt-in, not a second account."}
               </div>
+              {!requestedReady && (
+                <div className="rounded-lg p-3 text-sm" style={{ border: "1px solid var(--line)", background: "var(--bg)" }}>
+                  {role === "borrower"
+                    ? "Borrowing isn’t enabled yet. Complete KYC, a credit check, and wallet connect, then enable borrowing."
+                    : "Lending isn’t enabled yet. Complete KYC, pick an accreditation tier, and connect a wallet, then enable lending."}
+                  {hasAccess(acct, role === "borrower" ? "lender" : "borrower") && (
+                    <div className="mt-2 text-xs">
+                      {role === "borrower" ? "Lending" : "Borrowing"} already works on this account — use the toggle above to enter that app.
+                    </div>
+                  )}
+                </div>
+              )}
               <CheckButton label="KYC" done={kycDone}
                 onPass={async () => patchAndStore(await api.verifyKyc())} />
               {needCredit && (
                 <CheckButton label="credit" done={creditDone}
                   onPass={async () => patchAndStore(await api.verifyCredit())} />
+              )}
+              {role === "lender" && !requestedReady && (
+                <label className="block space-y-1.5">
+                  <span
+                    className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em]"
+                    style={{ color: "var(--fg-soft)" }}
+                  >
+                    Accreditation tier
+                  </span>
+                  <span className="app-select-wrap">
+                    <select
+                      className="app-select"
+                      value={form.lender_tier}
+                      onChange={set("lender_tier")}
+                    >
+                      <option value="retail">Retail — Conservative pool only</option>
+                      <option value="professional">Professional — Conservative + Balanced</option>
+                      <option value="institutional">Institutional — all pools</option>
+                    </select>
+                  </span>
+                </label>
               )}
               <WalletConnect
                 wallet={connectedWallet}
@@ -364,9 +459,22 @@ export default function AuthPage() {
                 blocked={Boolean(devnet && !devnet.devnet_ready)}
                 warnings={devnet?.warnings || []}
               />
-              <Button className="w-full justify-center" disabled={!ready} onClick={() => enter()}>
-                Enter {acct.role || role} app →
-              </Button>
+              {requestedReady ? (
+                <Button className="w-full justify-center" disabled={!ready} onClick={() => enter()}>
+                  Enter {role} app →
+                </Button>
+              ) : (
+                <Button className="w-full justify-center" disabled={!onboardingDone || busy} onClick={enableRequestedAccess}>
+                  {busy ? "Enabling…" : `Enable ${role} access`}
+                </Button>
+              )}
+              <Link
+                to="/partners"
+                className="block text-center text-xs underline-offset-2 hover:underline"
+                style={{ color: "var(--fg-soft)" }}
+              >
+                Become a partner instead →
+              </Link>
             </div>
           ) : mode === "login" ? (
             <form onSubmit={doLogin} className="space-y-3">

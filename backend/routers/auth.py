@@ -14,14 +14,16 @@ import random
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlmodel import Session, select
 
-from ..db import Account, CheckStatus, Role
+from ..db import Account, CheckStatus, OnChainTx, Role
 from ..runtime import rt
 from ..neon_auth import verify_neon_token
-from ..schemas import AccountOut, LoginIn, NeonSessionIn, SignupIn, TokenOut, WalletConnectIn, WalletOut
+from ..schemas import AccessIn, AccountOut, LoginIn, NeonSessionIn, SignupIn, TokenOut, WalletConnectIn, WalletOut
 from ..services import (
     account_out,
+    apply_initial_access,
     current_account,
     explorer_account,
+    has_access,
     hash_password,
     issue_token,
     record_onchain_tx,
@@ -63,7 +65,9 @@ def signup(body: SignupIn, session: Session = Depends(session_dep)) -> TokenOut:
         raise HTTPException(400, "role must be 'lender' or 'borrower'")
     existing = session.exec(select(Account).where(Account.email == body.email)).first()
     if existing:
-        raise HTTPException(409, "email already registered")
+        if verify_password(body.password, existing.password_hash):
+            return TokenOut(token=issue_token(existing.id, session), account=account_out(existing))
+        raise HTTPException(409, "email already registered — log in to use this account")
     role = Role(body.role)
     from .. import config
     tier = body.lender_tier if body.lender_tier in config.LENDER_TIERS else "retail"
@@ -73,10 +77,11 @@ def signup(body: SignupIn, session: Session = Depends(session_dep)) -> TokenOut:
         email=body.email,
         password_hash=hash_password(body.password),
         kyc_status=CheckStatus.PENDING,
-        # lenders skip the credit check entirely
+        # lenders skip the credit check until they opt into borrowing
         credit_status=CheckStatus.NOT_REQUIRED if role == Role.LENDER else CheckStatus.PENDING,
         lender_tier=tier if role == Role.LENDER else "retail",
     )
+    apply_initial_access(acct, role)
     session.add(acct)
     session.commit()
     session.refresh(acct)
@@ -134,6 +139,7 @@ def neon_session(body: NeonSessionIn, session: Session = Depends(session_dep)) -
             credit_status=CheckStatus.NOT_REQUIRED if role == Role.LENDER else CheckStatus.PENDING,
             lender_tier=tier if role == Role.LENDER else "retail",
         )
+        apply_initial_access(acct, role)
         session.add(acct)
         session.commit()
         session.refresh(acct)
@@ -154,14 +160,52 @@ def verify_kyc(acct: Account = Depends(current_account), session: Session = Depe
 
 @router.post("/verify/credit", response_model=AccountOut)
 def verify_credit(acct: Account = Depends(current_account), session: Session = Depends(session_dep)):
-    """Simulate an external credit bureau (borrowers only)."""
-    if acct.role == Role.LENDER:
-        raise HTTPException(400, "lenders do not require a credit check")
+    """Simulate an external credit bureau (required to enable borrowing)."""
     acct.credit_status = CheckStatus.PASSED
     acct.credit_score = random.randint(640, 820)  # demo score feeds the rate engine
     session.add(acct)
     session.commit()
     session.refresh(acct)
+    return account_out(acct)
+
+
+@router.post("/access", response_model=AccountOut)
+def enable_access(
+    body: AccessIn,
+    acct: Account = Depends(current_account),
+    session: Session = Depends(session_dep),
+):
+    """Opt this company into another product surface. Never auto-enrolled."""
+    role_key = (body.role or "").strip().lower()
+    if role_key not in ("lender", "borrower", "partner"):
+        raise HTTPException(400, "role must be 'lender', 'borrower', or 'partner'")
+    if acct.kyc_status != CheckStatus.PASSED and role_key != "partner":
+        raise HTTPException(400, "complete KYC before extending access")
+    if role_key != "partner" and not acct.xrpl_address:
+        raise HTTPException(400, "connect a wallet before extending access")
+
+    if role_key == "borrower":
+        if acct.credit_status != CheckStatus.PASSED:
+            raise HTTPException(400, "complete a credit check before enabling borrowing")
+        acct.can_borrow = True
+        session.add(acct)
+        session.commit()
+        session.refresh(acct)
+        _ensure_live_borrower_credential(acct, session)
+    elif role_key == "lender":
+        from .. import config
+        if body.lender_tier in config.LENDER_TIERS:
+            acct.lender_tier = body.lender_tier
+        acct.can_lend = True
+        session.add(acct)
+        session.commit()
+        session.refresh(acct)
+        _ensure_live_lender_setup(acct, session)
+    else:
+        acct.can_partner = True
+        session.add(acct)
+        session.commit()
+        session.refresh(acct)
     return account_out(acct)
 
 
@@ -193,7 +237,7 @@ def connect_wallet(
     except RuntimeError as exc:
         raise HTTPException(503, f"Devnet live mode is not configured: {exc}") from exc
     from ..xrpl_service import assets
-    from ..xrpl_service.client import fund_wallet, get_client, wallet_from_seed
+    from ..xrpl_service.client import fund_wallet, get_client
     client = get_client()
     w = fund_wallet(client)
     trust = assets.create_trustline(w, rt.issuer_address, client)
@@ -206,53 +250,10 @@ def connect_wallet(
         tx_hash=trust.hash,
         engine_result=trust.engine_result,
     )
-    if acct.role == Role.LENDER:
-        mint = assets.mint_rlusd(wallet_from_seed(rt.issuer_seed), w.address, "500000", client)
-        if not mint.ok:
-            raise HTTPException(502, f"RLUSD mint failed on Devnet: {mint.engine_result}")
-        record_onchain_tx(
-            session,
-            account_id=acct.id,
-            action="lender_wallet_funding",
-            tx_hash=mint.hash,
-            engine_result=mint.engine_result,
-            amount=500000,
-        )
-        # Give the lender their own on-chain identity attestation: a distinct
-        # XLS-70 "CoinFish-Lender" credential, separate from their wallet/account.
-        from xrpl.utils import str_to_hex
-        from .. import config
-        from ..xrpl_service import identity
-        operator = wallet_from_seed(rt.operator_seed)
-        issue = identity.issue_credential(operator, w.address, identity.LENDER_CREDENTIAL_HEX, client)
-        if issue.ok:
-            record_onchain_tx(session, account_id=acct.id, action="credential_issue",
-                              tx_hash=issue.hash, engine_result=issue.engine_result)
-            acc = identity.accept_credential(w, operator.address, identity.LENDER_CREDENTIAL_HEX, client)
-            if acc.ok:
-                record_onchain_tx(session, account_id=acct.id, action="credential_accept",
-                                  tx_hash=acc.hash, engine_result=acc.engine_result)
-                acct.credential_id = acc.hash
-        # Add the lender to each pool's permissioned domain they're eligible for
-        # by issuing + accepting that pool's credential — REQUIRED before they can
-        # deposit into the pool's private vault.
-        tier = acct.lender_tier or "retail"
-        for pool_key in rt.pools:
-            if not config.lender_can_access(tier, pool_key):
-                continue
-            cred_hex = str_to_hex(config.pool_credential_type(pool_key))
-            pi = identity.issue_credential(operator, w.address, cred_hex, client)
-            if not pi.ok:
-                continue
-            record_onchain_tx(session, account_id=acct.id, action="pool_credential_issue",
-                              tx_hash=pi.hash, engine_result=pi.engine_result, pool_key=pool_key)
-            pa = identity.accept_credential(w, operator.address, cred_hex, client)
-            if pa.ok:
-                record_onchain_tx(session, account_id=acct.id, action="pool_credential_accept",
-                                  tx_hash=pa.hash, engine_result=pa.engine_result, pool_key=pool_key)
     address, seed, balance = w.address, w.seed, _rlusd_balance(w.address)
     set_wallet_connected(session, acct, provider=body.provider, address=address, seed=seed, balance=balance)
     session.commit()
+    _ensure_live_lender_setup(acct, session)
     _ensure_live_borrower_credential(acct, session)
     return WalletOut(xrpl_address=acct.xrpl_address, provider=acct.wallet_provider,
                      rlusd_balance=acct.wallet_rlusd_balance,
@@ -265,7 +266,7 @@ def me(acct: Account = Depends(current_account)) -> AccountOut:
 
 
 def _ensure_live_borrower_credential(acct: Account, session: Session) -> None:
-    if acct.role != Role.BORROWER:
+    if not has_access(acct, Role.BORROWER):
         return
     if acct.kyc_status != CheckStatus.PASSED or not acct.xrpl_seed or acct.credential_id:
         return
@@ -300,6 +301,71 @@ def _ensure_live_borrower_credential(acct: Account, session: Session) -> None:
         acct.credential_id = accept.hash
         session.add(acct)
         session.commit()
+
+
+def _has_tx_action(session: Session, account_id: int, action: str) -> bool:
+    row = session.exec(
+        select(OnChainTx).where(OnChainTx.account_id == account_id, OnChainTx.action == action)
+    ).first()
+    return row is not None
+
+
+def _ensure_live_lender_setup(acct: Account, session: Session) -> None:
+    if not has_access(acct, Role.LENDER):
+        return
+    if not acct.xrpl_seed:
+        return
+    if _has_tx_action(session, acct.id, "lender_wallet_funding"):
+        return
+    try:
+        rt.require_live_ready()
+    except RuntimeError:
+        return
+    from xrpl.utils import str_to_hex
+    from .. import config
+    from ..xrpl_service import assets, identity
+    from ..xrpl_service.client import get_client, wallet_from_seed
+    client = get_client()
+    w = wallet_from_seed(acct.xrpl_seed)
+    mint = assets.mint_rlusd(wallet_from_seed(rt.issuer_seed), w.address, "500000", client)
+    if not mint.ok:
+        return
+    record_onchain_tx(
+        session,
+        account_id=acct.id,
+        action="lender_wallet_funding",
+        tx_hash=mint.hash,
+        engine_result=mint.engine_result,
+        amount=500000,
+    )
+    operator = wallet_from_seed(rt.operator_seed)
+    issue = identity.issue_credential(operator, w.address, identity.LENDER_CREDENTIAL_HEX, client)
+    if issue.ok:
+        record_onchain_tx(session, account_id=acct.id, action="credential_issue",
+                          tx_hash=issue.hash, engine_result=issue.engine_result)
+        acc = identity.accept_credential(w, operator.address, identity.LENDER_CREDENTIAL_HEX, client)
+        if acc.ok:
+            record_onchain_tx(session, account_id=acct.id, action="credential_accept",
+                              tx_hash=acc.hash, engine_result=acc.engine_result)
+            if not acct.credential_id:
+                acct.credential_id = acc.hash
+    tier = acct.lender_tier or "retail"
+    for pool_key in rt.pools:
+        if not config.lender_can_access(tier, pool_key):
+            continue
+        cred_hex = str_to_hex(config.pool_credential_type(pool_key))
+        pi = identity.issue_credential(operator, w.address, cred_hex, client)
+        if not pi.ok:
+            continue
+        record_onchain_tx(session, account_id=acct.id, action="pool_credential_issue",
+                          tx_hash=pi.hash, engine_result=pi.engine_result, pool_key=pool_key)
+        pa = identity.accept_credential(w, operator.address, cred_hex, client)
+        if pa.ok:
+            record_onchain_tx(session, account_id=acct.id, action="pool_credential_accept",
+                              tx_hash=pa.hash, engine_result=pa.engine_result, pool_key=pool_key)
+    acct.wallet_rlusd_balance = _rlusd_balance(w.address)
+    session.add(acct)
+    session.commit()
 
 
 def _rlusd_balance(address: str) -> float:

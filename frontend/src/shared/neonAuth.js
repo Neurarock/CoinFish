@@ -46,6 +46,24 @@ function errCode(resultOrErr) {
   return String(err.code || err.body?.code || "");
 }
 
+export function alreadyRegistered(resultOrErr) {
+  const code = errCode(resultOrErr);
+  const msg = neonMessage(resultOrErr);
+  return [
+    "USER_ALREADY_EXISTS",
+    "user_already_exists",
+    "EMAIL_ALREADY_EXISTS",
+    "email_already_exists",
+  ].includes(code) || /already (exists|registered|been used)|duplicate|user exists/i.test(msg);
+}
+
+export function alreadyVerified(resultOrErr) {
+  const code = errCode(resultOrErr);
+  const msg = neonMessage(resultOrErr);
+  return ["EMAIL_ALREADY_VERIFIED", "email_already_verified"].includes(code)
+    || /already verified/i.test(msg);
+}
+
 export function needsEmailVerification(resultOrErr) {
   const code = errCode(resultOrErr);
   if (code === "EMAIL_NOT_VERIFIED" || code === "email_not_confirmed") return true;

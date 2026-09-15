@@ -193,7 +193,8 @@
   background: linear-gradient(120deg, var(--p-accent), var(--p-accent-2));
 }
 
-.partners-form .partners-btn-primary {
+.partners-form .partners-btn-primary,
+.partners-form .partners-btn-ghost {
   width: 100%;
 }
 

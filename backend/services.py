@@ -71,10 +71,57 @@ def current_account(
 
 def require_role(role: Role):
     def _dep(acct: Account = Depends(current_account)) -> Account:
-        if acct.role != role:
-            raise HTTPException(status_code=403, detail=f"Requires {role.value} role")
+        if not has_access(acct, role):
+            raise HTTPException(status_code=403, detail=f"Requires {role.value} access")
         return acct
     return _dep
+
+
+def has_access(acct: Account, role: Role) -> bool:
+    """True when this company is allowed into that product surface."""
+    if role == Role.ADMIN:
+        return acct.role == Role.ADMIN
+    if role == Role.LENDER and acct.can_lend:
+        return True
+    if role == Role.BORROWER and acct.can_borrow:
+        return True
+    # Legacy rows from before access flags: exclusive role is the only access.
+    if not acct.can_lend and not acct.can_borrow and not acct.can_partner:
+        return acct.role == role
+    return False
+
+
+def apply_initial_access(acct: Account, role: Role) -> None:
+    if role == Role.LENDER:
+        acct.can_lend = True
+    elif role == Role.BORROWER:
+        acct.can_borrow = True
+    elif role == Role.ADMIN:
+        acct.can_lend = True
+        acct.can_borrow = True
+
+
+def account_out(acct: Account) -> AccountOut:
+    return AccountOut(
+        id=acct.id,
+        role=acct.role.value,
+        can_lend=bool(acct.can_lend) or (acct.role == Role.LENDER and not acct.can_borrow),
+        can_borrow=bool(acct.can_borrow) or (acct.role == Role.BORROWER and not acct.can_lend),
+        can_partner=bool(acct.can_partner),
+        company_name=acct.company_name,
+        email=acct.email,
+        kyc_status=acct.kyc_status.value,
+        credit_status=acct.credit_status.value,
+        credit_score=acct.credit_score,
+        lender_tier=acct.lender_tier or "retail",
+        xrpl_address=acct.xrpl_address,
+        wallet_provider=acct.wallet_provider,
+        wallet_rlusd_balance=round(acct.wallet_rlusd_balance or 0.0, 2),
+        wallet_explorer_url=explorer_account(acct.xrpl_address) if acct.xrpl_address else "",
+        wallet_connected=bool(acct.xrpl_address),
+        credential_id=acct.credential_id or "",
+        credential_explorer_url=explorer_tx(acct.credential_id) if acct.credential_id else "",
+    )
 
 
 # --- fiat ledger -------------------------------------------------------------
@@ -96,26 +143,6 @@ def collateral_locked(session: Session, account_id: int) -> float:
     locked = sum(r.amount for r in rows if r.entry_type == "lock")
     released = sum(r.amount for r in rows if r.entry_type == "release")
     return round(abs(locked) - abs(released), 2)
-
-
-def account_out(acct: Account) -> AccountOut:
-    return AccountOut(
-        id=acct.id,
-        role=acct.role.value,
-        company_name=acct.company_name,
-        email=acct.email,
-        kyc_status=acct.kyc_status.value,
-        credit_status=acct.credit_status.value,
-        credit_score=acct.credit_score,
-        lender_tier=acct.lender_tier or "retail",
-        xrpl_address=acct.xrpl_address,
-        wallet_provider=acct.wallet_provider,
-        wallet_rlusd_balance=round(acct.wallet_rlusd_balance or 0.0, 2),
-        wallet_explorer_url=explorer_account(acct.xrpl_address) if acct.xrpl_address else "",
-        wallet_connected=bool(acct.xrpl_address),
-        credential_id=acct.credential_id or "",
-        credential_explorer_url=explorer_tx(acct.credential_id) if acct.credential_id else "",
-    )
 
 
 def explorer_account(address: str) -> str:

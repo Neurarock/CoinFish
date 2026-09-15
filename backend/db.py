@@ -54,12 +54,26 @@ def _resolve_db_url() -> str:
 
 DB_URL = _resolve_db_url()
 
+# libpq default connect can hang well past a minute when Neon compute is
+# asleep or unreachable. Fail fast so uvicorn can still bind :8000.
+_PG_CONNECT_ARGS = {"connect_timeout": 10}
+
 if DB_URL.startswith("sqlite"):
     engine = create_engine(DB_URL, echo=False, connect_args={"check_same_thread": False})
+elif os.getenv("VERCEL"):
+    # Serverless: don't keep pooled connections alive between invocations.
+    engine = create_engine(
+        DB_URL, echo=False, pool_pre_ping=True, poolclass=NullPool,
+        connect_args=_PG_CONNECT_ARGS,
+    )
 else:
-    # Serverless-friendly: don't keep pooled connections alive between
-    # invocations, and validate a connection before using it.
-    engine = create_engine(DB_URL, echo=False, pool_pre_ping=True, poolclass=NullPool)
+    # Local/dev: reuse connections. NullPool opened a new TLS session for
+    # every ALTER during startup and blocked the API for 30s+.
+    engine = create_engine(
+        DB_URL, echo=False, pool_pre_ping=True,
+        pool_size=5, max_overflow=10, pool_timeout=10,
+        connect_args=_PG_CONNECT_ARGS,
+    )
 
 
 # --- enums -------------------------------------------------------------------
@@ -84,10 +98,13 @@ class LoanStatus(str, Enum):
 
 # --- tables ------------------------------------------------------------------
 class Account(SQLModel, table=True):
-    """A signed-up company, either a lender or a borrower."""
+    """A signed-up company. One login can hold several kinds of access."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    role: Role
+    role: Role                       # first product surface they enrolled in
+    can_lend: bool = False
+    can_borrow: bool = False
+    can_partner: bool = False
     company_name: str
     email: str = Field(index=True)
     password_hash: str = ""
@@ -207,6 +224,9 @@ def _ensure_account_columns() -> None:
         "wallet_connected_at": "DATETIME",
         "lender_tier": "VARCHAR DEFAULT 'retail'",
         "neon_user_id": "VARCHAR DEFAULT ''",
+        "can_lend": "BOOLEAN DEFAULT 0",
+        "can_borrow": "BOOLEAN DEFAULT 0",
+        "can_partner": "BOOLEAN DEFAULT 0",
     }
     pg_adds = {
         "wallet_provider": "VARCHAR DEFAULT ''",
@@ -214,16 +234,52 @@ def _ensure_account_columns() -> None:
         "wallet_connected_at": "TIMESTAMP",
         "lender_tier": "VARCHAR DEFAULT 'retail'",
         "neon_user_id": "VARCHAR DEFAULT ''",
+        "can_lend": "BOOLEAN DEFAULT FALSE",
+        "can_borrow": "BOOLEAN DEFAULT FALSE",
+        "can_partner": "BOOLEAN DEFAULT FALSE",
     }
-    with engine.begin() as conn:
-        if engine.dialect.name == "sqlite":
+    if engine.dialect.name == "sqlite":
+        with engine.begin() as conn:
             cols = {row[1] for row in conn.execute(text("PRAGMA table_info(account)"))}
             for name, ddl in sqlite_adds.items():
                 if name not in cols:
                     conn.execute(text(f"ALTER TABLE account ADD COLUMN {name} {ddl}"))
-        else:  # postgres et al. support ADD COLUMN IF NOT EXISTS
-            for name, ddl in pg_adds.items():
-                try:
-                    conn.execute(text(f"ALTER TABLE account ADD COLUMN IF NOT EXISTS {name} {ddl}"))
-                except Exception:
-                    pass
+            _backfill_access_flags(conn, postgres=False)
+        return
+
+    # Inspect once, then ALTER only missing columns in a single connection.
+    # (A failed statement still aborts the Postgres transaction, so we must
+    # not run ADD COLUMN IF NOT EXISTS in a loop that can error mid-way.)
+    with engine.begin() as conn:
+        cols = {
+            row[0]
+            for row in conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = current_schema() AND table_name = 'account'"
+            ))
+        }
+        for name, ddl in pg_adds.items():
+            if name not in cols:
+                conn.execute(text(f"ALTER TABLE account ADD COLUMN {name} {ddl}"))
+        _backfill_access_flags(conn, postgres=True)
+
+
+def _backfill_access_flags(conn, *, postgres: bool) -> None:
+    """Grant the matching flag to rows that only have a legacy exclusive role.
+
+    Neon stored Role as the enum *name* ('LENDER') in some environments and the
+    *value* ('lender') in others, so match case-insensitively.
+    """
+    role_expr = "lower(role::text)" if postgres else "lower(role)"
+    true_lit = "TRUE" if postgres else "1"
+    unset = (
+        "COALESCE(can_lend, FALSE) = FALSE AND COALESCE(can_borrow, FALSE) = FALSE"
+        if postgres
+        else "IFNULL(can_lend, 0) = 0 AND IFNULL(can_borrow, 0) = 0"
+    )
+    conn.execute(text(
+        f"UPDATE account SET can_lend = {true_lit} WHERE {role_expr} = 'lender' AND {unset}"
+    ))
+    conn.execute(text(
+        f"UPDATE account SET can_borrow = {true_lit} WHERE {role_expr} = 'borrower' AND {unset}"
+    ))

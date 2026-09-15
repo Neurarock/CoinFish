@@ -35,6 +35,9 @@ class NeonSessionIn(BaseModel):
 class AccountOut(BaseModel):
     id: int
     role: str
+    can_lend: bool = False
+    can_borrow: bool = False
+    can_partner: bool = False
     company_name: str
     email: str
     kyc_status: str
@@ -48,6 +51,12 @@ class AccountOut(BaseModel):
     wallet_connected: bool
     credential_id: str = ""             # XLS-70 credential accept-tx (borrower identity)
     credential_explorer_url: str = ""
+
+
+class AccessIn(BaseModel):
+    """Opt into another product surface on the same company account."""
+    role: str                          # "lender" | "borrower" | "partner"
+    lender_tier: str = "retail"
 
 
 class TokenOut(BaseModel):

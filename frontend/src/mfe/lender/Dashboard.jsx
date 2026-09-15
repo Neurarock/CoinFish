@@ -2,6 +2,7 @@
 // yield, and a withdraw control that either settles immediately or shows the
 // exit-queue status when pool liquidity is short.
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../shared/api.js";
 import Layout from "../../shared/components/Layout.jsx";
 import PoolWater from "../../shared/components/PoolWater.jsx";
@@ -53,7 +54,7 @@ export default function LenderDashboard() {
       <h2 className="mt-8 mb-3 text-xl font-bold">Positions</h2>
       {d.positions.length === 0 && (
         <div className="card p-5" style={{ color: "var(--fg-soft)" }}>
-          No positions yet — fund a pool from the Deposit tab.
+          No positions yet — <Link to="/lender/deposit" style={{ color: "var(--accent)" }}>fund a pool</Link>.
         </div>
       )}
 

@@ -40,6 +40,7 @@ export const api = {
   login: (b) => req("POST", "/auth/login", b),
   neonSession: (b) => req("POST", "/auth/neon", b),
   me: () => req("GET", "/auth/me"),
+  enableAccess: (b) => req("POST", "/auth/access", b),
   verifyKyc: () => req("POST", "/auth/verify/kyc"),
   verifyCredit: () => req("POST", "/auth/verify/credit"),
   connectWallet: (b) => req("POST", "/auth/wallet/connect", b),

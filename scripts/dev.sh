@@ -21,7 +21,7 @@ else
   UV_RUN=""
 fi
 
-$UV_RUN python -m uvicorn backend.main:app --reload --reload-dir backend --host 127.0.0.1 --port 8000 &
+$UV_RUN python -m uvicorn backend.main:app --reload --reload-dir backend --reload-exclude '*test*.py' --host 127.0.0.1 --port 8000 &
 API_PID=$!
 
 $UV_RUN python -m uvicorn db_service.main:app --reload --host 127.0.0.1 --port 8001 &

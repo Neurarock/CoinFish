@@ -16,7 +16,7 @@ const PILLARS = [
   {
     id: "product",
     title: "Product",
-    body: "Risk-tiered pools, off-chain collateral, and on-ledger RLUSD — lend, borrow, and operate from one surface.",
+    body: "AML/KYC yield for lenders with verified accredited borrowers. Instant on-chain liquidity for borrowers at the point of need, secured with prearranged off-chain collateral. CoinFish vets both sides for institutional-grade compliance.",
     to: "/app",
   },
   {

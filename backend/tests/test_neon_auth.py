@@ -82,9 +82,13 @@ def test_neon_session_creates_account(monkeypatch):
         body = created.json()
         assert body["account"]["email"] == "ops-neon@example.test"
         assert body["account"]["role"] == "borrower"
-        resumed = c.post("/auth/neon", json={"token": "good-jwt"})
+        assert body["account"]["can_borrow"] is True
+        assert body["account"]["can_lend"] is False
+        resumed = c.post("/auth/neon", json={"token": "good-jwt", "role": "lender"})
         assert resumed.status_code == 200
         assert resumed.json()["account"]["id"] == body["account"]["id"]
+        assert resumed.json()["account"]["can_borrow"] is True
+        assert resumed.json()["account"]["can_lend"] is False
 
 
 def test_neon_session_relinks_after_identity_recreation(monkeypatch):

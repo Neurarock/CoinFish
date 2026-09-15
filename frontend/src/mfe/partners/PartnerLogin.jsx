@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import Logo from "../../shared/components/Logo.jsx";
-import { isPartnerAuthed, setPartnerSession } from "./session.js";
+import { isPartnerAuthed, isPartnerEnrolled, enrollPartner, setPartnerSession } from "./session.js";
+import { api, setToken } from "../../shared/api.js";
 
 export default function PartnerLogin() {
   const nav = useNavigate();
@@ -13,18 +14,29 @@ export default function PartnerLogin() {
     return <Navigate to="/partners/home" replace />;
   }
 
-  function submit(e) {
+  function submit(e, enroll) {
     e.preventDefault();
     setErr("");
     if (!form.email.trim() || !form.password.trim()) {
       setErr("Email and password are required.");
       return;
     }
+    const email = form.email.trim();
+    if (!enroll && !isPartnerEnrolled(email)) {
+      setErr("This email isn’t a partner yet. Click Become a partner to enroll — we don’t add partner access automatically.");
+      return;
+    }
+    if (enroll) enrollPartner(email);
     setPartnerSession({
-      email: form.email.trim(),
+      email,
       org_id: form.org_id.trim() || "demo-org",
       at: Date.now(),
     });
+    const cfToken = sessionStorage.getItem("cf_token");
+    if (enroll && cfToken) {
+      setToken(cfToken);
+      api.enableAccess({ role: "partner" }).catch(() => {});
+    }
     nav("/partners/home");
   }
 
@@ -47,10 +59,11 @@ export default function PartnerLogin() {
           <h1>Sign in</h1>
           <p className="partners-lede">
             Integrator access for API keys, usage, and commissions.
-            This demo accepts any credentials — nothing is verified yet.
+            Sign in if you already enrolled. New firms click Become a partner —
+            nothing is enrolled automatically.
           </p>
 
-          <form className="partners-form" onSubmit={submit}>
+          <form className="partners-form" onSubmit={(e) => submit(e, false)}>
             <label>
               <span>Work email</span>
               <input
@@ -84,12 +97,19 @@ export default function PartnerLogin() {
             </label>
             {err && <p className="partners-err">{err}</p>}
             <button type="submit" className="partners-btn partners-btn-primary">
-              Enter portal
+              Sign in
+            </button>
+            <button
+              type="button"
+              className="partners-btn partners-btn-ghost"
+              onClick={(e) => submit(e, true)}
+            >
+              Become a partner
             </button>
           </form>
 
           <p className="partners-hint">
-            Placeholder only · no backend partner auth in this build
+            Placeholder only · partner auth is local to this browser
           </p>
         </div>
       </main>

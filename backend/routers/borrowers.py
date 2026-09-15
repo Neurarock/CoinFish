@@ -315,9 +315,12 @@ def deposit_rlusd(body: RlusdDepositIn, acct: Account = Depends(borrower_only),
         raise HTTPException(503, "RLUSD issuer is not configured on this Devnet setup")
     from ..xrpl_service import assets
     from ..xrpl_service.client import get_client, wallet_from_seed
-    client = get_client()
-    res = assets.mint_rlusd(wallet_from_seed(rt.issuer_seed), acct.xrpl_address,
-                            round(body.amount, 2), client)
+    try:
+        client = get_client()
+        res = assets.mint_rlusd(wallet_from_seed(rt.issuer_seed), acct.xrpl_address,
+                                round(body.amount, 2), client)
+    except Exception as exc:
+        raise HTTPException(502, f"RLUSD deposit failed on Devnet: {exc}") from exc
     if not res.ok:
         raise HTTPException(502, f"RLUSD deposit failed on Devnet: {res.engine_result}")
     record_onchain_tx(
@@ -328,7 +331,14 @@ def deposit_rlusd(body: RlusdDepositIn, acct: Account = Depends(borrower_only),
         engine_result=res.engine_result,
         amount=round(body.amount, 2),
     )
-    acct.wallet_rlusd_balance = assets.rlusd_balance(acct.xrpl_address, rt.issuer_address, client)
+    try:
+        acct.wallet_rlusd_balance = assets.rlusd_balance(
+            acct.xrpl_address, rt.issuer_address, client
+        )
+    except Exception:
+        acct.wallet_rlusd_balance = round(
+            (acct.wallet_rlusd_balance or 0.0) + body.amount, 2
+        )
     session.add(acct)
     session.commit()
     return {"ok": True, "amount": round(body.amount, 2), "tx_hash": res.hash,

@@ -1,5 +1,5 @@
 // Thin fetch wrapper around the CoinFish FastAPI backend.
-// In dev, Vite proxies /api -> http://localhost:8000 (see vite.config.js).
+// In dev, Vite proxies /api -> http://127.0.0.1:8000 (see vite.config.js).
 const BASE = import.meta.env.VITE_API_BASE || "/api";
 
 let token = null;
@@ -17,7 +17,16 @@ async function req(method, path, body) {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // Starlette's default 500 (and some proxies) return plaintext
+      // "Internal Server Error" — surface that instead of a JSON parse crash.
+      throw new Error(text.trim() || res.statusText || "Request failed");
+    }
+  }
   if (!res.ok) {
     const detail = data?.detail || res.statusText;
     throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));

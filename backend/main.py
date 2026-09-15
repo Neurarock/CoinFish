@@ -11,13 +11,29 @@ actions to XRPL Devnet and records their explorer links.
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import config, db
 from .routers import admin, auth, borrowers, lenders, loans, pools, runtime_status, transactions
 
 app = FastAPI(title="CoinFish", version="0.2.0")
+_log = logging.getLogger("coinfish")
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, exc: Exception):
+    """Starlette's default 500 is plaintext 'Internal Server Error', which the
+    frontend JSON.parse()s into 'Unexpected token I'. Always return JSON."""
+    if isinstance(exc, StarletteHTTPException):
+        return await http_exception_handler(request, exc)
+    _log.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 # the three themed frontends run on the Vite dev server during development
 app.add_middleware(

@@ -45,7 +45,7 @@ def submit(tx, *wallets: Wallet, client: JsonRpcClient | None = None) -> TxResul
     submitter = wallets[0]
     try:
         response = submit_and_wait(tx, client, submitter)
-    except XRPLReliableSubmissionException as exc:
+    except (XRPLReliableSubmissionException, Exception) as exc:
         return TxResult(ok=False, hash="", engine_result=str(exc), raw={"error": str(exc)})
     result = response.result
     meta = result.get("meta", {})
@@ -65,7 +65,7 @@ def submit_signed(tx, *, client: JsonRpcClient | None = None) -> TxResult:
     # so we must not mutate it (that would invalidate the co-signature).
     try:
         response = submit_and_wait(tx, client, autofill=False, check_fee=False)
-    except XRPLReliableSubmissionException as exc:
+    except (XRPLReliableSubmissionException, Exception) as exc:
         return TxResult(ok=False, hash="", engine_result=str(exc), raw={"error": str(exc)})
     result = response.result
     meta = result.get("meta", {})

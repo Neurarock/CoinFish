@@ -4,8 +4,8 @@
   "version": "0.2.0",
   "scripts": {
     "uv:sync": "uv sync --all-packages",
-    "api": "uv run uvicorn backend.main:app --reload --port 8000",
-    "api:devnet": "uv run uvicorn backend.main:app --reload --port 8000",
+    "api": "uv run uvicorn backend.main:app --reload --reload-dir backend --host 127.0.0.1 --port 8000",
+    "api:devnet": "uv run uvicorn backend.main:app --reload --reload-dir backend --host 127.0.0.1 --port 8000",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:migrate": "cd db_service && uv run alembic upgrade head",

@@ -1,10 +1,6 @@
 """Neon Managed Better Auth claim mapping and session exchange."""
 from __future__ import annotations
 
-import os
-
-os.environ["COINFISH_DB_URL"] = "sqlite:////tmp/coinfish-test-neon-auth.db"
-
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -130,7 +126,7 @@ def test_neon_session_login_uses_coinfish_role_not_neon_user(monkeypatch):
         "backend.routers.auth.verify_neon_token",
         lambda token: NeonIdentity(
             user_id="n-lender",
-            email="lender-neon@example.test",
+            email="lender-neon-role@example.test",
             email_verified=True,
             name="Jonathan",
         ),

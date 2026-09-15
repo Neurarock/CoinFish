@@ -37,7 +37,7 @@ YIELD_FACTOR = 0.0
 def deposit(body: DepositIn, acct: Account = Depends(lender_only),
             session: Session = Depends(session_dep)) -> dict:
     require_devnet_transactions("Lender deposit")
-    if not acct.xrpl_address:
+    if not acct.xrpl_address or not acct.xrpl_seed:
         raise HTTPException(400, "connect a wallet first")
     pool = rt.pool(body.pool_key)
     if not pool:
@@ -58,9 +58,12 @@ def deposit(body: DepositIn, acct: Account = Depends(lender_only),
         rt.require_live_ready(pool_key=pool.key)
     except RuntimeError as exc:
         raise HTTPException(503, f"Devnet live mode is not configured: {exc}") from exc
-    client = get_client()
-    res = vault.deposit(wallet_from_seed(acct.xrpl_seed), pool.vault_id,
-                        rt.issuer_address, body.amount, client)
+    try:
+        client = get_client()
+        res = vault.deposit(wallet_from_seed(acct.xrpl_seed), pool.vault_id,
+                            rt.issuer_address, body.amount, client)
+    except Exception as exc:
+        raise HTTPException(502, f"VaultDeposit failed on Devnet: {exc}") from exc
     if not res.ok:
         raise HTTPException(502, f"VaultDeposit failed on Devnet: {res.engine_result}")
     tx_hash = res.hash
@@ -73,11 +76,17 @@ def deposit(body: DepositIn, acct: Account = Depends(lender_only),
         pool_key=pool.key,
         amount=body.amount,
     )
-    acct.wallet_rlusd_balance = assets.rlusd_balance(acct.xrpl_address, rt.issuer_address, client)
+    try:
+        acct.wallet_rlusd_balance = assets.rlusd_balance(
+            acct.xrpl_address, rt.issuer_address, client
+        )
+    except Exception:
+        pass  # on-chain deposit already succeeded; keep last known balance
 
     pool.tvl += body.amount                       # shares ~ 1:1 in demo
     row = Deposit(account_id=acct.id, pool_key=pool.key, principal=body.amount,
                   shares=body.amount, deposit_tx=tx_hash)
+    session.add(acct)
     session.add(row)
     session.commit()
     return {"ok": True, "tx_hash": tx_hash, "explorer_url": explorer_tx(tx_hash),
@@ -102,18 +111,26 @@ def withdraw(body: WithdrawIn, acct: Account = Depends(lender_only),
         rt.require_live_ready(pool_key=pool.key)
     except RuntimeError as exc:
         raise HTTPException(503, f"Devnet live mode is not configured: {exc}") from exc
-    client = get_client()
-    available, _total = vault.vault_liquidity(pool.vault_id, client)
+    if not acct.xrpl_seed:
+        raise HTTPException(400, "connect a wallet first")
+    try:
+        client = get_client()
+        available, _total = vault.vault_liquidity(pool.vault_id, client)
+    except Exception as exc:
+        raise HTTPException(502, f"Vault liquidity lookup failed on Devnet: {exc}") from exc
     fill = min(body.amount, available)
     tx_hashes: list[str] = []
     if fill > 0:
-        res = vault.withdraw(
-            wallet_from_seed(acct.xrpl_seed),
-            pool.vault_id,
-            rt.issuer_address,
-            fill,
-            client,
-        )
+        try:
+            res = vault.withdraw(
+                wallet_from_seed(acct.xrpl_seed),
+                pool.vault_id,
+                rt.issuer_address,
+                fill,
+                client,
+            )
+        except Exception as exc:
+            raise HTTPException(502, f"VaultWithdraw failed on Devnet: {exc}") from exc
         if not res.ok:
             raise HTTPException(502, f"VaultWithdraw failed on Devnet: {res.engine_result}")
         tx_hashes.append(res.hash)
@@ -127,7 +144,12 @@ def withdraw(body: WithdrawIn, acct: Account = Depends(lender_only),
             amount=fill,
         )
         pool.tvl = max(0.0, pool.tvl - fill)
-        acct.wallet_rlusd_balance = assets.rlusd_balance(acct.xrpl_address, rt.issuer_address, client)
+        try:
+            acct.wallet_rlusd_balance = assets.rlusd_balance(
+                acct.xrpl_address, rt.issuer_address, client
+            )
+        except Exception:
+            pass
     remaining = round(body.amount - fill, 2)
     status = "filled" if remaining <= 1e-6 else "partial" if fill > 0 else "pending"
     row = ExitRow(account_id=acct.id, pool_key=pool.key,

@@ -17,7 +17,18 @@ from sqlmodel import Session, select
 from ..db import Account, CheckStatus, OnChainTx, Role
 from ..runtime import rt
 from ..neon_auth import verify_neon_token
-from ..schemas import AccessIn, AccountOut, LoginIn, NeonSessionIn, SignupIn, TokenOut, WalletConnectIn, WalletOut
+from ..schemas import (
+    AccessIn,
+    AccountOut,
+    ChangePasswordIn,
+    LoginIn,
+    NeonSessionIn,
+    ResetPasswordIn,
+    SignupIn,
+    TokenOut,
+    WalletConnectIn,
+    WalletOut,
+)
 from ..services import (
     account_out,
     apply_initial_access,
@@ -95,6 +106,60 @@ def login(body: LoginIn, session: Session = Depends(session_dep)) -> TokenOut:
     if not acct or not verify_password(body.password, acct.password_hash):
         raise HTTPException(401, "invalid credentials")
     return TokenOut(token=issue_token(acct.id, session), account=account_out(acct))
+
+
+@router.post("/password", response_model=AccountOut)
+def change_password(
+    body: ChangePasswordIn,
+    acct: Account = Depends(current_account),
+    session: Session = Depends(session_dep),
+) -> AccountOut:
+    """Update the demo Account password shared by lender / borrower / partner.
+
+    When Neon Auth is enabled the browser calls Neon changePassword instead;
+    this endpoint covers local/CI demo accounts that store password_hash.
+    """
+    _require_demo_auth()
+    if not acct.password_hash:
+        raise HTTPException(
+            400,
+            "this account uses Neon Auth — change the password from the signed-in app",
+        )
+    if len(body.new_password or "") < 8:
+        raise HTTPException(400, "new password must be at least 8 characters")
+    if body.new_password == body.current_password:
+        raise HTTPException(400, "new password must be different from the current password")
+    if not verify_password(body.current_password, acct.password_hash):
+        raise HTTPException(401, "current password is incorrect")
+    acct.password_hash = hash_password(body.new_password)
+    session.add(acct)
+    session.commit()
+    session.refresh(acct)
+    return account_out(acct)
+
+
+@router.post("/password/reset", response_model=AccountOut)
+def reset_password(
+    body: ResetPasswordIn,
+    session: Session = Depends(session_dep),
+) -> AccountOut:
+    """Demo-only password reset when the user cannot sign in.
+
+    Neon Auth owns production resets (email OTP from the browser). Local/CI
+    has no mailer, so this endpoint sets a new hash for an existing demo
+    account after email lookup.
+    """
+    _require_demo_auth()
+    if len(body.new_password or "") < 8:
+        raise HTTPException(400, "new password must be at least 8 characters")
+    acct = session.exec(select(Account).where(Account.email == body.email)).first()
+    if not acct or not acct.password_hash:
+        raise HTTPException(404, "no demo account found for that email")
+    acct.password_hash = hash_password(body.new_password)
+    session.add(acct)
+    session.commit()
+    session.refresh(acct)
+    return account_out(acct)
 
 
 @router.post("/neon", response_model=TokenOut)

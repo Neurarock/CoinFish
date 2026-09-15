@@ -168,6 +168,18 @@
   font-size: 0.85rem;
 }
 
+.partners-forgot-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.35rem 0 0;
+}
+
+.partners-ok {
+  margin: 0;
+  color: #6ec9b8;
+  font-size: 0.85rem;
+}
+
 .partners-btn {
   display: inline-flex;
   align-items: center;
@@ -238,6 +250,10 @@
   border: 1px solid var(--p-line);
   border-radius: 22px;
   background: color-mix(in srgb, var(--p-panel) 90%, transparent);
+}
+
+.partners-tile-span {
+  grid-column: 1 / -1;
 }
 
 .partners-tile h2 {

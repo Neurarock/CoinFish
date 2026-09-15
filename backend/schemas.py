@@ -22,6 +22,17 @@ class LoginIn(BaseModel):
     password: str
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class ResetPasswordIn(BaseModel):
+    """Demo-only forgot-password reset (no email OTP locally)."""
+    email: str
+    new_password: str
+
+
 class NeonSessionIn(BaseModel):
     """Exchange a Neon Auth JWT for a CoinFish product session."""
     token: str

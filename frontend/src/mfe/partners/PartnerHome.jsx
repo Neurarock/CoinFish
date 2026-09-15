@@ -1,6 +1,8 @@
-// Stub Partner Portal home — coming-soon API keys and usage.
+// Partner Portal home — coming-soon API keys/usage + shared password change.
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "../../shared/components/Logo.jsx";
+import ChangePasswordForm from "../../shared/components/ChangePasswordForm.jsx";
+import { neonAuthEnabled } from "../../shared/neonAuth.js";
 import { clearPartnerSession, getPartnerSession } from "./session.js";
 
 export default function PartnerHome() {
@@ -55,6 +57,16 @@ export default function PartnerHome() {
             <p>Volume, request counts, and commission tracking — empty until production.</p>
             <div className="partners-empty">No usage data in this demo.</div>
             <p className="partners-badge">Coming soon</p>
+          </section>
+
+          <section className="partners-tile partners-tile-span">
+            <h2>Change password</h2>
+            <p>
+              {neonAuthEnabled
+                ? "Updates Neon Auth. The same password signs you into lender, borrower, and partner."
+                : "Updates the company account password used by lender, borrower, and partner."}
+            </p>
+            <ChangePasswordForm variant="partners" />
           </section>
         </div>
 

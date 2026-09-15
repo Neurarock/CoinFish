@@ -21,6 +21,7 @@ import {
 import { Button, Field, Pill, VerifyLink, rlusd } from "../../shared/components/ui.jsx";
 import CheckButton from "../../shared/components/CheckButton.jsx";
 import DevnetBadge from "../../shared/components/DevnetBadge.jsx";
+import ForgotPasswordForm from "../../shared/components/ForgotPasswordForm.jsx";
 import Logo from "../../shared/components/Logo.jsx";
 import { useTx } from "../../shared/components/TxProcessing.jsx";
 import { enterPath, hasAccess } from "../../shared/access.js";
@@ -359,7 +360,7 @@ export default function AuthPage() {
             {!acct && (
               <>
                 <TabBtn on={mode === "signup"} onClick={() => { setMode("signup"); setOtpPending(false); setErr(""); }}>Sign up</TabBtn>
-                <TabBtn on={mode === "login"} onClick={() => { setMode("login"); setOtpPending(false); setErr(""); }}>Log in</TabBtn>
+                <TabBtn on={mode === "login" || mode === "forgot"} onClick={() => { setMode("login"); setOtpPending(false); setErr(""); }}>Log in</TabBtn>
               </>
             )}
             <span className={acct ? "" : "ml-auto"}><Pill tone={role === "lender" ? "accent" : "muted"}>{role}</Pill></span>
@@ -476,10 +477,26 @@ export default function AuthPage() {
                 Become a partner instead →
               </Link>
             </div>
+          ) : mode === "forgot" ? (
+            <ForgotPasswordForm
+              initialEmail={form.email}
+              onBack={() => { setMode("login"); setErr(""); }}
+              onDone={() => { setMode("login"); setErr(""); }}
+            />
           ) : mode === "login" ? (
             <form onSubmit={doLogin} className="space-y-3">
               <Field label="Work email" type="email" value={form.email} onChange={set("email")} required />
               <Field label="Password" type="password" value={form.password} onChange={set("password")} required />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="text-xs underline-offset-2 hover:underline"
+                  style={{ color: "var(--fg-soft)" }}
+                  onClick={() => { setMode("forgot"); setOtpPending(false); setErr(""); }}
+                >
+                  Forgot password?
+                </button>
+              </div>
               <Button className="w-full justify-center" disabled={busy}>
                 {busy ? "Signing in…" : "Log in"}
               </Button>

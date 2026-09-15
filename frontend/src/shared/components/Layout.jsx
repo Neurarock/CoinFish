@@ -63,6 +63,17 @@ function SignOutIcon() {
   );
 }
 
+function AccountIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" className="app-vault-badge-icon">
+      <path
+        fill="currentColor"
+        d="M12 3.75a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 1.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM6.25 19.5a5.75 5.75 0 0 1 11.5 0 .75.75 0 0 1-1.5 0 4.25 4.25 0 0 0-8.5 0 .75.75 0 0 1-1.5 0Z"
+      />
+    </svg>
+  );
+}
+
 const BORROWER_NAV = [
   ["/borrower/collateral", "Collateral", CollateralIcon],
   ["/borrower/borrow", "Borrow", BorrowIcon],
@@ -116,6 +127,15 @@ export default function Layout({ role, children }) {
               </NavBadge>
               {account && (
                 <NavBadge
+                  to="/lender/account"
+                  icon={<AccountIcon />}
+                  current={loc.pathname === "/lender/account"}
+                >
+                  Account
+                </NavBadge>
+              )}
+              {account && (
+                <NavBadge
                   icon={<SignOutIcon />}
                   onClick={() => { logout(); nav("/app"); }}
                 >
@@ -151,6 +171,15 @@ export default function Layout({ role, children }) {
                   {label}
                 </NavBadge>
               ))}
+              {account && (
+                <NavBadge
+                  to="/borrower/account"
+                  icon={<AccountIcon />}
+                  current={loc.pathname === "/borrower/account"}
+                >
+                  Account
+                </NavBadge>
+              )}
               {account && (
                 <NavBadge
                   icon={<SignOutIcon />}

@@ -160,6 +160,58 @@ export async function neonVerifySignupOtp({ email, otp, password }) {
   }
 }
 
+export async function neonChangePassword({ currentPassword, newPassword, revokeOtherSessions = false }) {
+  if (!authClient) throw new Error("Neon Auth is not configured");
+  const result = await authClient.changePassword({
+    currentPassword,
+    newPassword,
+    revokeOtherSessions,
+  });
+  if (result?.error) throw new Error(neonMessage(result));
+  return result?.data ?? result;
+}
+
+export async function neonRequestPasswordReset(email) {
+  if (!authClient) throw new Error("Neon Auth is not configured");
+  // Prefer the current Email OTP endpoint; fall back only when the method is
+  // missing on older Neon Auth builds (not when Neon returns an auth error).
+  const attempts = [
+    () => authClient.emailOtp?.requestPasswordReset?.({ email }),
+    () => authClient.forgetPassword?.emailOtp?.({ email }),
+    () => authClient.emailOtp?.sendVerificationOtp?.({ email, type: "forget-password" }),
+  ];
+  let sawCallable = false;
+  for (const attempt of attempts) {
+    let result;
+    try {
+      result = await attempt();
+    } catch (err) {
+      // Method missing / not a function → try next; real network/API errors throw.
+      if (err instanceof TypeError) continue;
+      throw err instanceof Error ? err : new Error(neonMessage(err));
+    }
+    if (result == null) continue;
+    sawCallable = true;
+    if (result.error) throw new Error(neonMessage(result));
+    return result?.data ?? result;
+  }
+  if (!sawCallable) {
+    throw new Error("Password reset is not available on this Neon Auth build");
+  }
+  throw new Error("Could not send a password reset code");
+}
+
+export async function neonResetPassword({ email, otp, password }) {
+  if (!authClient) throw new Error("Neon Auth is not configured");
+  const result = await authClient.emailOtp.resetPassword({
+    email,
+    otp,
+    password,
+  });
+  if (result?.error) throw new Error(neonMessage(result));
+  return result?.data ?? result;
+}
+
 export async function neonSignOut() {
   if (!authClient) return;
   try {

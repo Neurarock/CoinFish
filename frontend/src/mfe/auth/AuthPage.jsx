@@ -55,7 +55,7 @@ export default function AuthPage() {
     setAcct(account);
   }, [account]);
   useEffect(() => {
-    if (!account) return undefined;
+    if (!account?.id) return undefined;
     let cancelled = false;
     api.me().then((next) => {
       if (cancelled || !next) return;
@@ -63,7 +63,7 @@ export default function AuthPage() {
       setAcct(next);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [account?.id]);
+  }, [account?.id, patchAccount]);
   useEffect(() => {
     let cancelled = false;
     api.runtimeStatus().then((status) => {

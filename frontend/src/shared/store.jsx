@@ -1,7 +1,7 @@
 // Auth/session context. Holds the logged-in account and token, and exposes the
 // role so ThemeShell can pick the right palette. Demo-grade: token kept in memory
 // + sessionStorage so a refresh doesn't drop you (no real security).
-import { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import { api, setToken } from "./api.js";
 
 const AuthCtx = createContext(null);
@@ -14,7 +14,9 @@ function readSavedSession() {
       setToken(saved);
       return { token: saved, account: JSON.parse(acct) };
     }
-  } catch {}
+  } catch {
+    return { token: null, account: null };
+  }
   return { token: null, account: null };
 }
 
@@ -31,10 +33,10 @@ export function AuthProvider({ children }) {
     sessionStorage.setItem("cf_account", JSON.stringify(account));
   }
 
-  function patchAccount(next) {
+  const patchAccount = useCallback((next) => {
     setAccount(next);
     sessionStorage.setItem("cf_account", JSON.stringify(next));
-  }
+  }, []);
 
   function logout() {
     import("./neonAuth.js").then((m) => m.neonSignOut()).catch(() => {});
